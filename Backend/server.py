@@ -18,13 +18,14 @@ from flask_cors import CORS
 MAX_ATTEMPTS = 5
 LOCK_TIME_SECONDS = 60
 FAILED_IP_ATTEMPTS = {}
+LEDGER_FILE = "secure_logs_chain.json"
 
 # ===============================
 # IMMUTABLE LEDGER
 # ===============================
 
 class ImmutableAuditLedger:
-    def __init__(self, file_path="secure_logs_chain.json", secret_key="LEDGER_HMAC_SECRET"):
+    def __init__(self, file_path=LEDGER_FILE, secret_key="LEDGER_HMAC_SECRET"):
         self.file_path = file_path
         self.secret_key = secret_key.encode()
         self.lock = threading.Lock()
@@ -43,7 +44,6 @@ class ImmutableAuditLedger:
     def _create_genesis_block(self):
         ts = datetime.now(UTC).isoformat(timespec="seconds")
         data = {"event": "GENESIS", "msg": "Audit chain initialized"}
-
         block_hash = self._calculate_hash(0, ts, data, "0")
 
         block = {
@@ -96,11 +96,13 @@ class ImmutableAuditLedger:
     def add_block(self, event_type, payload):
         with self.lock:
             chain = self.load_chain()
+            if not chain:
+                self._create_genesis_block()
+                chain = self.load_chain()
+
             prev = chain[-1]
             ts = datetime.now(UTC).isoformat(timespec="seconds")
-
             data = {"event_type": event_type, "payload": payload}
-
             new_index = prev["index"] + 1
             h = self._calculate_hash(new_index, ts, data, prev["hash"])
 
@@ -122,6 +124,7 @@ class ImmutableAuditLedger:
 
 app = Flask(__name__)
 app.secret_key = "CHANGE_THIS_TO_RANDOM_SECRET"
+app.permanent_session_lifetime = timedelta(hours=8)
 CORS(app, supports_credentials=True)
 
 ledger = ImmutableAuditLedger()
@@ -155,8 +158,6 @@ def create_login_log(user, ip, fingerprint, status):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-
-        # FIX 1: Use naive time for MySQL compatibility
         now_naive = datetime.now(UTC).replace(tzinfo=None)
 
         cursor.execute("""
@@ -166,11 +167,7 @@ def create_login_log(user, ip, fingerprint, status):
         """, (user, ip, now_naive, status, fingerprint))
 
         conn.commit()
-        
-        # FIX 2: Ensure ID is captured
         log_id = cursor.lastrowid
-        print(f"[DEBUG] Log created. Status: {status}, ID: {log_id}")
-
         cursor.close()
         return log_id
 
@@ -193,15 +190,12 @@ def close_login_session(log_id):
         cursor.execute("SELECT login_time FROM access_logs WHERE id=%s", (log_id,))
         row = cursor.fetchone()
 
-        if row:
+        if row and row[0]:
             login_time = row[0]
-            
-            # FIX 3: Timezone aware subtraction fix
             if login_time.tzinfo:
                 login_time = login_time.replace(tzinfo=None)
-                
+
             logout_time = datetime.now(UTC).replace(tzinfo=None)
-            
             duration = int((logout_time - login_time).total_seconds())
 
             cursor.execute("""
@@ -213,7 +207,6 @@ def close_login_session(log_id):
             """, (logout_time, duration, log_id))
 
             conn.commit()
-            print(f"[DEBUG] Session {log_id} closed. Duration: {duration}s")
 
         cursor.close()
 
@@ -248,7 +241,7 @@ def serve_client():
     return send_from_directory(".", "client.html")
 
 # ===============================
-# LOGIN (UPDATED)
+# LOGIN (WEB + FINGERPRINT + CARD)
 # ===============================
 
 @app.route("/login", methods=["POST"])
@@ -257,91 +250,106 @@ def login():
     if not data:
         return jsonify({"error": "Invalid request"}), 400
 
+    staff_id = data.get("staff_id")
+    card_id = data.get("card_id")
     username = data.get("username")
     password = data.get("password")
-    ip = request.remote_addr
-    
-    # Calculate fingerprint early so we can log it on failure
-    fingerprint = get_fingerprint() 
-    
+
+    auth_method = None
+
+    if staff_id:
+        login_user = staff_id
+        ip = "N/A (Fingerprint)"
+        fingerprint = hashlib.sha256(f"fp_device_{staff_id}".encode()).hexdigest()
+        auth_method = "FINGERPRINT"
+
+    elif card_id:
+        login_user = card_id
+        ip = "N/A (ID_CARD)"
+        fingerprint = hashlib.sha256(f"card_device_{card_id}".encode()).hexdigest()
+        auth_method = "ID_CARD"
+
+    else:
+        login_user = username
+        ip = request.remote_addr
+        fingerprint = get_fingerprint()
+        auth_method = "WEB"
+
     now = datetime.now(UTC)
 
-    # 1. Check IP Block
-    if ip in FAILED_IP_ATTEMPTS:
-        info = FAILED_IP_ATTEMPTS[ip]
-        if info.get("lock_until") and now < info["lock_until"]:
-            # LOG BLOCKING EVENT
-            create_login_log(username, ip, fingerprint, "BLOCKED")
-            return jsonify({"error": "IP temporarily blocked"}), 403
+    if auth_method == "WEB":
+        if ip in FAILED_IP_ATTEMPTS:
+            info = FAILED_IP_ATTEMPTS[ip]
+            if info.get("lock_until") and now < info["lock_until"]:
+                create_login_log(login_user, ip, fingerprint, "BLOCKED")
+                return jsonify({"error": "IP temporarily blocked"}), 403
 
-    attempts = FAILED_IP_ATTEMPTS.get(ip, {}).get("count", 0)
+        attempts = FAILED_IP_ATTEMPTS.get(ip, {}).get("count", 0)
+    else:
+        attempts = 0
 
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT password_hash FROM admins WHERE username=%s", (username,))
-        row = cursor.fetchone()
-        cursor.close()
-        conn.close()
 
-        # 2. Check User Existence
+        cursor.execute("SELECT password_hash FROM admins WHERE username=%s", (login_user,))
+        row = cursor.fetchone()
+
         if not row:
-            # LOG FAILED EVENT (User not found)
-            create_login_log(username, ip, fingerprint, "FAILED")
+            create_login_log(login_user, ip, fingerprint, "FAILED")
             return jsonify({"error": "Access Denied"}), 401
 
         stored_hash = row[0]
         if isinstance(stored_hash, str):
             stored_hash = stored_hash.encode()
 
-        # 3. Check Password
-        if bcrypt.checkpw(password.encode(), stored_hash):
+        auth_success = False
 
-            FAILED_IP_ATTEMPTS.pop(ip, None)
+        if auth_method in ["FINGERPRINT", "ID_CARD"]:
+            auth_success = True
+        elif password and bcrypt.checkpw(password.encode(), stored_hash):
+            auth_success = True
 
-            # LOG SUCCESS EVENT
-            log_id = create_login_log(
-                username,
-                ip,
-                fingerprint,
-                "OPEN"
-            )
+        if auth_success:
+            if auth_method == "WEB":
+                FAILED_IP_ATTEMPTS.pop(ip, None)
 
-            session["admin_user"] = username
+            log_id = create_login_log(login_user, ip, fingerprint, "OPEN")
+
+            session.permanent = True
+            session["admin_user"] = login_user
             session["fingerprint"] = fingerprint
             session["log_id"] = log_id
 
             ledger.add_block("LOGIN", {
-                "user": username,
-                "ip": ip
+                "user": login_user,
+                "method": auth_method
             })
 
             return jsonify({"message": "Access Granted"})
 
-        # 4. Failed Login (Wrong Password)
-        attempts += 1
+        if auth_method == "WEB":
+            attempts += 1
+            if attempts >= MAX_ATTEMPTS:
+                FAILED_IP_ATTEMPTS[ip] = {
+                    "count": attempts,
+                    "lock_until": now + timedelta(seconds=LOCK_TIME_SECONDS)
+                }
+                create_login_log(login_user, ip, fingerprint, "BLOCKED")
+                return jsonify({"error": "IP temporarily blocked"}), 403
 
-        if attempts >= MAX_ATTEMPTS:
-            FAILED_IP_ATTEMPTS[ip] = {
-                "count": attempts,
-                "lock_until": now + timedelta(seconds=LOCK_TIME_SECONDS)
-            }
-            # LOG BLOCKING EVENT (After threshold reached)
-            create_login_log(username, ip, fingerprint, "BLOCKED")
-            return jsonify({"error": "IP temporarily blocked"}), 403
+            FAILED_IP_ATTEMPTS[ip] = {"count": attempts, "lock_until": None}
 
-        FAILED_IP_ATTEMPTS[ip] = {"count": attempts, "lock_until": None}
-
-        # LOG FAILED EVENT (Wrong Password)
-        create_login_log(username, ip, fingerprint, "FAILED")
-
+        create_login_log(login_user, ip, fingerprint, "FAILED")
         return jsonify({"error": "Access Denied"}), 401
 
     except Exception as e:
         print("Auth Error:", e)
-        # LOG SYSTEM ERROR
-        create_login_log(username, ip, fingerprint, "ERROR")
+        create_login_log(login_user, ip, fingerprint, "ERROR")
         return jsonify({"error": "Server error"}), 500
+    finally:
+        cursor.close()
+        conn.close()
 
 # ===============================
 # LOGOUT
@@ -350,7 +358,6 @@ def login():
 @app.route("/logout", methods=["POST"])
 @login_required
 def logout():
-
     user = session.get("admin_user")
     ip = request.remote_addr
     log_id = session.get("log_id")
@@ -364,7 +371,6 @@ def logout():
     })
 
     session.clear()
-
     return jsonify({"message": "Logged out"})
 
 # ===============================
@@ -374,10 +380,41 @@ def logout():
 @app.route("/api/monitor", methods=["GET"])
 @login_required
 def api_monitor():
+    current_fp = get_fingerprint()
+    sess_fp = session.get("fingerprint")
+    log_id = session.get("log_id")
 
-    if session.get("fingerprint") != get_fingerprint():
-        session.clear()
-        return jsonify({"error": "Session violation detected"}), 403
+    if "fp_device_" not in str(sess_fp) and "card_device_" not in str(sess_fp):
+        if sess_fp != current_fp:
+            session.clear()
+            return jsonify({"error": "Session violation detected"}), 403
+
+    if log_id:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT login_time FROM access_logs WHERE id=%s", (log_id,))
+            row = cursor.fetchone()
+
+            if row and row[0]:
+                login_time = row[0]
+                if login_time.tzinfo:
+                    login_time = login_time.replace(tzinfo=None)
+
+                now = datetime.now(UTC).replace(tzinfo=None)
+                duration = (now - login_time).total_seconds()
+
+                if duration > 8 * 60 * 60:
+                    close_login_session(log_id)
+                    session.clear()
+                    return jsonify({"error": "Session expired (8 hours limit)"}), 401
+
+            cursor.close()
+            conn.close()
+
+        except Exception as e:
+            print("Session expiry check failed:", e)
 
     valid, msg = ledger.verify_chain()
 
@@ -395,6 +432,89 @@ def api_monitor():
         "server_time": datetime.now(UTC).isoformat(timespec="seconds")
     })
 
+# ===============================
+# ATTACK SIMULATION
+# ===============================
+
+@app.route("/simulate/corrupt", methods=["POST"])
+def simulate_corruption():
+    try:
+        if os.path.exists(LEDGER_FILE):
+            with open(LEDGER_FILE, "r") as f:
+                data = json.load(f)
+
+            if len(data) > 0:
+                data[0]["data"]["msg"] = "HAX0R WAS HERE"
+
+                with open(LEDGER_FILE, "w") as f:
+                    json.dump(data, f, indent=4)
+
+                return jsonify({"message": "Ledger Corrupted Successfully"}), 200
+
+        return jsonify({"error": "Ledger not found"}), 404
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route("/api/session_log", methods=["POST"])
+@login_required
+def session_log():
+    data = request.get_json()
+    ledger.add_block("SESSION_EVENT", data)
+    return jsonify({"message": "Logged"})
+
+# ===============================
+# ADMIN LOGIN REPORTS
+# ===============================
+
+@app.route("/api/admin/success_logins", methods=["GET"])
+@login_required
+def admin_success_logins():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT id, username, ip_address, login_time, logout_time, duration_seconds, status
+            FROM access_logs
+            WHERE username = 'admin'
+            AND status IN ('OPEN', 'CLOSED')
+            ORDER BY login_time DESC
+        """)
+
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return jsonify(rows)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/failed_logins", methods=["GET"])
+@login_required
+def admin_failed_logins():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT id, username, ip_address, login_time, status
+            FROM access_logs
+            WHERE username = 'admin'
+            AND status = 'FAILED'
+            ORDER BY login_time DESC
+        """)
+
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return jsonify(rows)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 # ===============================
 # RUN
 # ===============================

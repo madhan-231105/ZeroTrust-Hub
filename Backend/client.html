@@ -1,952 +1,2529 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SECURE-CORE | Enterprise Security Dashboard</title>
     <style>
-        :root {
-            --bg-deep: #05070a;
-            --bg-panel: #0d1117;
-            --bg-card: #161b22;
-            --accent-cyan: #00f2ff;
-            --accent-green: #39ff14;
-            --accent-red: #ff3131;
-            --text-main: #e6edf3;
-            --text-dim: #8b949e;
-            --glow-cyan: 0 0 15px rgba(0, 242, 255, 0.3);
-            --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      :root {
+        --bg-deep: #05070a;
+        --bg-panel: #0d1117;
+        --bg-card: #161b22;
+        --accent-cyan: #00f2ff;
+        --accent-green: #39ff14;
+        --accent-red: #ff3131;
+        --accent-orange: #ff8c00;
+        --text-main: #e6edf3;
+        --text-dim: #8b949e;
+        --glow-cyan: 0 0 15px rgba(0, 242, 255, 0.3);
+        --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+
+      body {
+        background-color: var(--bg-deep);
+        color: var(--text-main);
+        overflow: hidden;
+        height: 100vh;
+      }
+
+      /* --- Layout Structures --- */
+      .dashboard-container {
+        display: grid;
+        grid-template-columns: 1fr 350px;
+        height: 100vh;
+        gap: 1px;
+        background: #30363d;
+      }
+
+      header {
+        grid-column: 1 / span 2;
+        height: 60px;
+        background: var(--bg-panel);
+        display: flex;
+        align-items: center;
+        padding: 0 30px;
+        justify-content: space-between;
+        border-bottom: 1px solid #30363d;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+      }
+
+      .logo {
+        font-weight: 800;
+        letter-spacing: 2px;
+        font-size: 1.2rem;
+        color: var(--accent-cyan);
+        text-shadow: var(--glow-cyan);
+      }
+
+      .main-content {
+        background: var(--bg-deep);
+        padding: 40px;
+        position: relative;
+        overflow-y: auto;
+      }
+
+      /* --- Sidebar Status Panel --- */
+      .status-panel {
+        background: var(--bg-panel);
+        padding: 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 25px;
+        border-left: 1px solid #30363d;
+        overflow-y: auto;
+      }
+
+      .status-header {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--text-dim);
+        border-bottom: 1px solid #30363d;
+        padding-bottom: 10px;
+      }
+
+      .status-item {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .status-label {
+        font-size: 0.75rem;
+        color: var(--text-dim);
+      }
+
+      .status-value {
+        font-family: "Courier New", Courier, monospace;
+        font-weight: bold;
+        color: var(--accent-cyan);
+      }
+
+      .threat-indicator {
+        height: 40px;
+        border-radius: 4px;
+        background: #1c2128;
+        display: flex;
+        align-items: center;
+        padding: 0 15px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .threat-bar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 30%;
+        transition: var(--transition);
+      }
+
+      /* --- Selection Grid --- */
+      .view-section {
+        display: none;
+        animation: fadeIn 0.5s ease-out forwards;
+      }
+
+      .view-section.active {
+        display: block;
+      }
+
+      .selection-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 25px;
+      }
+
+      .device-card {
+        background: var(--bg-card);
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 30px;
+        text-align: center;
+        cursor: pointer;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .device-card:hover {
+        transform: translateY(-5px);
+        border-color: var(--accent-cyan);
+        box-shadow: var(--glow-cyan);
+      }
+
+      .device-card svg {
+        width: 50px;
+        height: 50px;
+        fill: var(--accent-cyan);
+        margin-bottom: 15px;
+      }
+
+      .device-card h3 {
+        font-size: 1rem;
+        margin-bottom: 10px;
+      }
+
+      /* --- Device Interface Panels --- */
+      .interface-panel {
+        background: var(--bg-panel);
+        border-radius: 16px;
+        padding: 40px;
+        max-width: 700px;
+        margin: 0 auto;
+        border: 1px solid #30363d;
+      }
+
+      .back-btn {
+        background: none;
+        border: 1px solid var(--text-dim);
+        color: var(--text-dim);
+        padding: 8px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-bottom: 30px;
+        transition: var(--transition);
+      }
+
+      .back-btn:hover {
+        color: var(--accent-cyan);
+        border-color: var(--accent-cyan);
+      }
+
+      .input-group {
+        margin-bottom: 20px;
+      }
+
+      .input-group label {
+        display: block;
+        font-size: 0.8rem;
+        margin-bottom: 8px;
+        color: var(--text-dim);
+      }
+
+      select,
+      input {
+        width: 100%;
+        background: var(--bg-deep);
+        border: 1px solid #30363d;
+        padding: 12px;
+        color: white;
+        border-radius: 6px;
+        outline: none;
+      }
+
+      .primary-btn {
+        width: 100%;
+        padding: 15px;
+        background: var(--accent-cyan);
+        border: none;
+        color: var(--bg-deep);
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: var(--transition);
+      }
+
+      .primary-btn:hover {
+        filter: brightness(1.2);
+        box-shadow: var(--glow-cyan);
+      }
+
+      /* --- Animations: ID Card --- */
+      .reader-slot {
+        width: 300px;
+        height: 20px;
+        background: #000;
+        margin: 50px auto;
+        border-radius: 10px;
+        position: relative;
+        border: 2px solid #30363d;
+      }
+
+      .id-card {
+        width: 120px;
+        height: 80px;
+        background: linear-gradient(45deg, #1f6feb, #00f2ff);
+        border-radius: 8px;
+        position: absolute;
+        top: -100px;
+        left: -150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.6rem;
+        font-weight: bold;
+        color: #000;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        z-index: 10;
+      }
+
+      .swipe-active .id-card {
+        animation: swipeAnim 2s forwards;
+      }
+
+      @keyframes swipeAnim {
+        0% {
+          transform: translateX(0) translateY(0);
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        30% {
+          transform: translateX(200px) translateY(100px);
         }
-
-        body {
-            background-color: var(--bg-deep);
-            color: var(--text-main);
-            overflow: hidden;
-            height: 100vh;
+        50% {
+          transform: translateX(250px) translateY(100px);
         }
-
-        /* --- Layout Structures --- */
-        .dashboard-container {
-            display: grid;
-            grid-template-columns: 1fr 350px;
-            height: 100vh;
-            gap: 1px;
-            background: #30363d;
+        100% {
+          transform: translateX(600px) translateY(100px);
         }
+      }
 
-        header {
-            grid-column: 1 / span 2;
-            height: 60px;
-            background: var(--bg-panel);
-            display: flex;
-            align-items: center;
-            padding: 0 30px;
-            justify-content: space-between;
-            border-bottom: 1px solid #30363d;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+      /* --- Animations: Fingerprint --- */
+      .fingerprint-container {
+        width: 180px;
+        height: 180px;
+        margin: 0 auto 30px;
+        border: 4px solid #1c2128;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        cursor: pointer;
+      }
+
+      .scanner-ring {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border: 2px solid var(--accent-cyan);
+        border-radius: 50%;
+        animation: pulseRing 2s infinite;
+      }
+
+      .fingerprint-svg {
+        width: 80px;
+        height: 80px;
+        fill: var(--accent-cyan);
+        transition: var(--transition);
+      }
+
+      .scanning .fingerprint-svg {
+        animation: scanGlow 1s infinite alternate;
+      }
+
+      @keyframes pulseRing {
+        0% {
+          transform: scale(0.8);
+          opacity: 0.8;
         }
-
-        .logo {
-            font-weight: 800;
-            letter-spacing: 2px;
-            font-size: 1.2rem;
-            color: var(--accent-cyan);
-            text-shadow: var(--glow-cyan);
+        100% {
+          transform: scale(1.3);
+          opacity: 0;
         }
+      }
 
-        .main-content {
-            background: var(--bg-deep);
-            padding: 40px;
-            position: relative;
-            overflow-y: auto;
+      @keyframes scanGlow {
+        from {
+          fill: var(--accent-cyan);
+          filter: drop-shadow(0 0 2px var(--accent-cyan));
         }
-
-        /* --- Sidebar Status Panel --- */
-        .status-panel {
-            background: var(--bg-panel);
-            padding: 30px;
-            display: flex;
-            flex-direction: column;
-            gap: 25px;
-            border-left: 1px solid #30363d;
+        to {
+          fill: var(--accent-green);
+          filter: drop-shadow(0 0 15px var(--accent-green));
         }
+      }
 
-        .status-header {
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: var(--text-dim);
-            border-bottom: 1px solid #30363d;
-            padding-bottom: 10px;
+      /* --- Animations: Printer Ripple --- */
+      .ping-container {
+        position: relative;
+        width: 100px;
+        height: 100px;
+        margin: 0 auto 20px;
+      }
+
+      .ripple {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 10px;
+        height: 10px;
+        background: var(--accent-cyan);
+        border-radius: 50%;
+        opacity: 0;
+      }
+
+      .pinging .ripple {
+        animation: rippleEffect 1.5s infinite;
+      }
+
+      @keyframes rippleEffect {
+        0% {
+          width: 0;
+          height: 0;
+          opacity: 0.8;
         }
-
-        .status-item {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
+        100% {
+          width: 150px;
+          height: 150px;
+          opacity: 0;
         }
+      }
 
-        .status-label {
-            font-size: 0.75rem;
-            color: var(--text-dim);
+      /* --- Loading Spinner --- */
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(0, 242, 255, 0.1);
+        border-top: 4px solid var(--accent-cyan);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 20px auto;
+        display: none;
+      }
+
+      @keyframes spin {
+        100% {
+          transform: rotate(360deg);
         }
+      }
 
-        .status-value {
-            font-family: 'Courier New', Courier, monospace;
-            font-weight: bold;
-            color: var(--accent-cyan);
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
         }
-
-        .threat-indicator {
-            height: 40px;
-            border-radius: 4px;
-            background: #1c2128;
-            display: flex;
-            align-items: center;
-            padding: 0 15px;
-            position: relative;
-            overflow: hidden;
+        to {
+          opacity: 1;
+          transform: translateY(0);
         }
+      }
 
-        .threat-bar {
-            position: absolute;
-            left: 0;
-            top: 0;
-            height: 100%;
-            width: 30%;
-            transition: var(--transition);
+      .success-msg {
+        color: var(--accent-green);
+        text-align: center;
+        margin-top: 20px;
+        font-weight: bold;
+      }
+      .error-msg {
+        color: var(--accent-red);
+        text-align: center;
+        margin-top: 20px;
+        font-weight: bold;
+      }
+
+      /* Utilities for Logout Toggle */
+      .hidden {
+        display: none !important;
+      }
+      .logout-btn {
+        background: var(--accent-red);
+        color: white;
+        margin-top: 15px;
+      }
+      .logout-btn:hover {
+        filter: brightness(1.2);
+        box-shadow: 0 0 15px rgba(255, 49, 49, 0.3);
+      }
+
+      /* Attack Button Style */
+      .attack-btn {
+        width: 100%;
+        padding: 12px;
+        margin-top: 20px;
+        background: transparent;
+        border: 1px solid var(--accent-red);
+        color: var(--accent-red);
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: var(--transition);
+      }
+      .attack-btn:hover {
+        background: var(--accent-red);
+        color: white;
+        box-shadow: 0 0 15px rgba(255, 49, 49, 0.4);
+      }
+
+      /* Session info box */
+      .session-info-box {
+        padding: 15px;
+        background: var(--bg-deep);
+        border-radius: 6px;
+        margin-bottom: 20px;
+        font-family: "Courier New", monospace;
+        font-size: 0.75rem;
+        border: 1px solid #30363d;
+      }
+
+      .session-info-box p {
+        margin-bottom: 6px;
+        color: var(--text-dim);
+      }
+
+      .session-info-box span {
+        color: var(--accent-cyan);
+      }
+
+      .session-info-box .warn-text {
+        color: #ffcc00;
+      }
+
+      /* Session countdown timer */
+      .session-countdown {
+        font-family: "Courier New", monospace;
+        font-size: 1.4rem;
+        color: var(--accent-green);
+        text-align: center;
+        margin: 10px 0;
+        letter-spacing: 3px;
+      }
+
+      .session-countdown.warning {
+        color: #ffcc00;
+        animation: blink 1s infinite;
+      }
+
+      .session-countdown.critical {
+        color: var(--accent-red);
+        animation: blink 0.5s infinite;
+      }
+
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
         }
-
-        /* --- Selection Grid --- */
-        .view-section {
-            display: none;
-            animation: fadeIn 0.5s ease-out forwards;
+        50% {
+          opacity: 0.4;
         }
+      }
 
-        .view-section.active {
-            display: block;
+      /* Session log table */
+      .session-log {
+        margin-top: 15px;
+      }
+
+      .session-log-title {
+        font-size: 0.7rem;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 8px;
+      }
+
+      .session-log-entry {
+        background: #1c2128;
+        border-radius: 4px;
+        padding: 8px 12px;
+        margin-bottom: 6px;
+        font-family: "Courier New", monospace;
+        font-size: 0.7rem;
+        border-left: 3px solid var(--accent-cyan);
+      }
+
+      .session-log-entry.closed {
+        border-left-color: var(--text-dim);
+        opacity: 0.6;
+      }
+
+      .session-log-entry.expired {
+        border-left-color: var(--accent-red);
+        opacity: 0.7;
+      }
+
+      /* ===== ADDED: Rescue Button Style ===== */
+      .rescue-btn {
+        width: 100%;
+        padding: 12px;
+        margin-top: 12px;
+        background: transparent;
+        border: 2px solid var(--accent-orange);
+        color: var(--accent-orange);
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: var(--transition);
+        animation: rescuePulse 2s infinite;
+      }
+      .rescue-btn:hover {
+        background: var(--accent-orange);
+        color: white;
+        box-shadow: 0 0 15px rgba(255, 140, 0, 0.5);
+        animation: none;
+      }
+      @keyframes rescuePulse {
+        0%,
+        100% {
+          box-shadow: 0 0 5px rgba(255, 140, 0, 0.3);
         }
-
-        .selection-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 25px;
+        50% {
+          box-shadow: 0 0 20px rgba(255, 140, 0, 0.7);
         }
+      }
 
-        .device-card {
-            background: var(--bg-card);
-            border: 1px solid #30363d;
-            border-radius: 12px;
-            padding: 30px;
-            text-align: center;
-            cursor: pointer;
-            transition: var(--transition);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .device-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--accent-cyan);
-            box-shadow: var(--glow-cyan);
-        }
-
-        .device-card svg {
-            width: 50px;
-            height: 50px;
-            fill: var(--accent-cyan);
-            margin-bottom: 15px;
-        }
-
-        .device-card h3 {
-            font-size: 1rem;
-            margin-bottom: 10px;
-        }
-
-        /* --- Device Interface Panels --- */
-        .interface-panel {
-            background: var(--bg-panel);
-            border-radius: 16px;
-            padding: 40px;
-            max-width: 700px;
-            margin: 0 auto;
-            border: 1px solid #30363d;
-        }
-
-        .back-btn {
-            background: none;
-            border: 1px solid var(--text-dim);
-            color: var(--text-dim);
-            padding: 8px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-bottom: 30px;
-            transition: var(--transition);
-        }
-
-        .back-btn:hover {
-            color: var(--accent-cyan);
-            border-color: var(--accent-cyan);
-        }
-
-        .input-group {
-            margin-bottom: 20px;
-        }
-
-        .input-group label {
-            display: block;
-            font-size: 0.8rem;
-            margin-bottom: 8px;
-            color: var(--text-dim);
-        }
-
-        select, input {
-            width: 100%;
-            background: var(--bg-deep);
-            border: 1px solid #30363d;
-            padding: 12px;
-            color: white;
-            border-radius: 6px;
-            outline: none;
-        }
-
-        .primary-btn {
-            width: 100%;
-            padding: 15px;
-            background: var(--accent-cyan);
-            border: none;
-            color: var(--bg-deep);
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: var(--transition);
-        }
-
-        .primary-btn:hover {
-            filter: brightness(1.2);
-            box-shadow: var(--glow-cyan);
-        }
-
-        /* --- Animations: ID Card --- */
-        .reader-slot {
-            width: 300px;
-            height: 20px;
-            background: #000;
-            margin: 50px auto;
-            border-radius: 10px;
-            position: relative;
-            border: 2px solid #30363d;
-        }
-
-        .id-card {
-            width: 120px;
-            height: 80px;
-            background: linear-gradient(45deg, #1f6feb, #00f2ff);
-            border-radius: 8px;
-            position: absolute;
-            top: -100px;
-            left: -150px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.6rem;
-            font-weight: bold;
-            color: #000;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-            z-index: 10;
-        }
-
-        .swipe-active .id-card {
-            animation: swipeAnim 2s forwards;
-        }
-
-        @keyframes swipeAnim {
-            0% { transform: translateX(0) translateY(0); }
-            30% { transform: translateX(200px) translateY(100px); }
-            50% { transform: translateX(250px) translateY(100px); }
-            100% { transform: translateX(600px) translateY(100px); }
-        }
-
-        /* --- Animations: Fingerprint --- */
-        .fingerprint-container {
-            width: 180px;
-            height: 180px;
-            margin: 0 auto 30px;
-            border: 4px solid #1c2128;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            cursor: pointer;
-        }
-
-        .scanner-ring {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border: 2px solid var(--accent-cyan);
-            border-radius: 50%;
-            animation: pulseRing 2s infinite;
-        }
-
-        .fingerprint-svg {
-            width: 80px;
-            height: 80px;
-            fill: var(--accent-cyan);
-            transition: var(--transition);
-        }
-
-        .scanning .fingerprint-svg {
-            animation: scanGlow 1s infinite alternate;
-        }
-
-        @keyframes pulseRing {
-            0% { transform: scale(0.8); opacity: 0.8; }
-            100% { transform: scale(1.3); opacity: 0; }
-        }
-
-        @keyframes scanGlow {
-            from { fill: var(--accent-cyan); filter: drop-shadow(0 0 2px var(--accent-cyan)); }
-            to { fill: var(--accent-green); filter: drop-shadow(0 0 15px var(--accent-green)); }
-        }
-
-        /* --- Animations: Printer Ripple --- */
-        .ping-container {
-            position: relative;
-            width: 100px;
-            height: 100px;
-            margin: 0 auto 20px;
-        }
-
-        .ripple {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 10px;
-            height: 10px;
-            background: var(--accent-cyan);
-            border-radius: 50%;
-            opacity: 0;
-        }
-
-        .pinging .ripple {
-            animation: rippleEffect 1.5s infinite;
-        }
-
-        @keyframes rippleEffect {
-            0% { width: 0; height: 0; opacity: 0.8; }
-            100% { width: 150px; height: 150px; opacity: 0; }
-        }
-
-        /* --- Loading Spinner --- */
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(0, 242, 255, 0.1);
-            border-top: 4px solid var(--accent-cyan);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-            display: none;
-        }
-
-        @keyframes spin {
-            100% { transform: rotate(360deg); }
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .success-msg { color: var(--accent-green); text-align: center; margin-top: 20px; font-weight: bold; }
-        .error-msg { color: var(--accent-red); text-align: center; margin-top: 20px; font-weight: bold; }
-
-        /* ADDED: Utilities for Logout Toggle */
-        .hidden { display: none !important; }
-        .logout-btn { background: var(--accent-red); color: white; margin-top: 15px; }
-        .logout-btn:hover { filter: brightness(1.2); box-shadow: 0 0 15px rgba(255, 49, 49, 0.3); }
-
+      /* ===== ADDED: Rescue Modal ===== */
+      .rescue-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+      }
+      .rescue-overlay.active {
+        display: flex;
+      }
+      .rescue-modal {
+        background: var(--bg-panel);
+        border: 2px solid var(--accent-orange);
+        border-radius: 16px;
+        padding: 40px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 0 40px rgba(255, 140, 0, 0.3);
+        animation: fadeIn 0.3s ease-out;
+      }
+      .rescue-modal h2 {
+        color: var(--accent-orange);
+        margin-bottom: 10px;
+        letter-spacing: 2px;
+      }
+      .rescue-modal p {
+        color: var(--text-dim);
+        font-size: 0.85rem;
+        margin-bottom: 20px;
+        line-height: 1.6;
+      }
+      .rescue-action {
+        background: #1c2128;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 12px;
+        cursor: pointer;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+      .rescue-action:hover {
+        border-color: var(--accent-orange);
+        background: #1f1a10;
+      }
+      .rescue-action-icon {
+        font-size: 1.5rem;
+        flex-shrink: 0;
+      }
+      .rescue-action-text strong {
+        display: block;
+        color: var(--accent-orange);
+        font-size: 0.85rem;
+        margin-bottom: 3px;
+      }
+      .rescue-action-text span {
+        color: var(--text-dim);
+        font-size: 0.75rem;
+      }
+      .rescue-close-btn {
+        width: 100%;
+        padding: 10px;
+        margin-top: 10px;
+        background: transparent;
+        border: 1px solid var(--text-dim);
+        color: var(--text-dim);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: var(--transition);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .rescue-close-btn:hover {
+        border-color: var(--accent-cyan);
+        color: var(--accent-cyan);
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
+    <!-- ===== ADDED: Rescue Modal Overlay ===== -->
+    <div class="rescue-overlay" id="rescue-overlay">
+      <div class="rescue-modal">
+        <h2>🚨 RESCUE MODE</h2>
+        <p>
+          Emergency access panel. Select a recovery action to restore system
+          state or clear a locked session.
+        </p>
+        <div class="rescue-action" onclick="rescueAction('clear_web')">
+          <div class="rescue-action-icon">🌐</div>
+          <div class="rescue-action-text">
+            <strong>Clear Web Session</strong>
+            <span>Force-logout the active web login session</span>
+          </div>
+        </div>
+        <div class="rescue-action" onclick="rescueAction('clear_idcard')">
+          <div class="rescue-action-icon">💳</div>
+          <div class="rescue-action-text">
+            <strong>Terminate ID Card Session</strong>
+            <span
+              >Force-close any active card swipe session &amp; reset UI</span
+            >
+          </div>
+        </div>
+        <div class="rescue-action" onclick="rescueAction('clear_fingerprint')">
+          <div class="rescue-action-icon">🖐️</div>
+          <div class="rescue-action-text">
+            <strong>Terminate Biometric Session</strong>
+            <span
+              >Force-close any active fingerprint session &amp; reset UI</span
+            >
+          </div>
+        </div>
+        <div class="rescue-action" onclick="rescueAction('clear_all')">
+          <div class="rescue-action-icon">⚠️</div>
+          <div class="rescue-action-text">
+            <strong>Full System Reset</strong>
+            <span>Clear ALL sessions, storage, and reset to initial state</span>
+          </div>
+        </div>
+        <div class="rescue-action" onclick="rescueAction('restore_threat')">
+          <div class="rescue-action-icon">🛡️</div>
+          <div class="rescue-action-text">
+            <strong>Reset Threat Level</strong>
+            <span>Force threat level back to LOW</span>
+          </div>
+        </div>
+        <button class="rescue-close-btn" onclick="closeRescue()">
+          ✕ Close Rescue Panel
+        </button>
+      </div>
+    </div>
 
-<div class="dashboard-container">
-    <header>
+    <div class="dashboard-container">
+      <header>
         <div class="logo">SECURE-CORE // ACCESS CONTROL</div>
-        <div id="live-clock" style="font-family: monospace; letter-spacing: 2px;">00:00:00</div>
-    </header>
+        <!-- ADDED: rescue button in header, clock kept as-is -->
+        <div style="display: flex; align-items: center; gap: 20px">
+          <button
+            onclick="openRescue()"
+            style="
+              background: transparent;
+              border: 1px solid var(--accent-orange);
+              color: var(--accent-orange);
+              padding: 6px 14px;
+              border-radius: 5px;
+              cursor: pointer;
+              font-size: 0.75rem;
+              font-weight: bold;
+              letter-spacing: 1px;
+              transition: var(--transition);
+            "
+            onmouseover="
+              this.style.background = 'var(--accent-orange)';
+              this.style.color = 'white';
+            "
+            onmouseout="
+              this.style.background = 'transparent';
+              this.style.color = 'var(--accent-orange)';
+            "
+          >
+            🚨 RESCUE
+          </button>
+          <div
+            id="live-clock"
+            style="font-family: monospace; letter-spacing: 2px"
+          >
+            00:00:00
+          </div>
+        </div>
+      </header>
 
-    <main class="main-content">
-        
+      <main class="main-content">
         <!-- Selection View -->
         <section id="view-selection" class="view-section active">
-            <h1 style="margin-bottom: 30px;">Select Authentication Node</h1>
-            <div class="selection-grid">
-                <div class="device-card" onclick="openInterface('web')">
-                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-                    <h3>Web Login</h3>
-                    <p style="color: var(--text-dim); font-size: 0.8rem;">Standard Protocol</p>
-                </div>
-                <div class="device-card" onclick="openInterface('idcard')">
-                    <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.1.89 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.11-.9-2-2-2zm0 14H4V6h16v12zM6 10h2v2H6zm0 4h8v2H6zm10 0h2v2h-2zm-6-4h8v2h-8z"/></svg>
-                    <h3>ID Card Access</h3>
-                    <p style="color: var(--text-dim); font-size: 0.8rem;">RFID / NFC Swipe</p>
-                </div>
-                <div class="device-card" onclick="openInterface('fingerprint')">
-                    <svg viewBox="0 0 24 24"><path d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.44-5.58 1.41-.28.16-.64.07-.8-.21-.16-.28-.07-.64.21-.8C7.67 2.37 9.77 1.9 12.01 1.9c2.13 0 4.02.46 5.8 1.51.28.16.37.52.21.8-.08.13-.21.26-.21.26zm2.36 4.19c-.01 0-.02 0-.03-.01-.51-.12-1.01-.18-1.53-.18-.51 0-.99.06-1.47.17-.31.07-.62-.12-.69-.43-.07-.31.12-.62.43-.69.59-.13 1.16-.2 1.73-.2.58 0 1.15.06 1.71.19.31.07.51.38.44.69-.06.27-.3.46-.59.46zM12 7c-1.63 0-3.06.35-4.39 1.05-.28.15-.64.04-.79-.24-.15-.28-.04-.64.24-.79C8.55 6.26 10.16 5.9 12 5.9c1.86 0 3.42.34 4.93 1.02.29.13.41.48.28.77-.13.29-.48.41-.77.28C15.12 7.33 13.62 7 12 7zm7.44 3.91c.03-.01.05-.01.08-.01.3-.01.55.21.59.51.05.33-.18.64-.51.69-1.27.19-1.78.36-2.91.75-.3.1-.63-.06-.73-.36-.1-.3.06-.63.36-.73 1.25-.43 1.83-.62 3.12-.85zM12 11.5c-1.01 0-1.95.14-2.85.43-.3.1-.63-.07-.73-.36-.1-.3.07-.63.36-.73 1.05-.34 2.14-.52 3.22-.52 1.1 0 2.14.18 3.14.53.3.11.46.43.35.73-.11.3-.43.46-.73.35-.91-.32-1.84-.43-2.76-.43z"/></svg>
-                    <h3>Fingerprint Scanner</h3>
-                    <p style="color: var(--text-dim); font-size: 0.8rem;">Biometric ID</p>
-                </div>
-                <div class="device-card" onclick="openInterface('printer')">
-                    <svg viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
-                    <h3>Printer Access</h3>
-                    <p style="color: var(--text-dim); font-size: 0.8rem;">Shared Services</p>
-                </div>
-                <div class="device-card" onclick="openInterface('network')">
-                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9L16.5 12 11 16.5z"/></svg>
-                    <h3>Network Service</h3>
-                    <p style="color: var(--text-dim); font-size: 0.8rem;">Custom Protocol</p>
-                </div>
+          <h1 style="margin-bottom: 30px">Select Authentication Node</h1>
+          <div class="selection-grid">
+            <div class="device-card" onclick="openInterface('web')">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"
+                />
+              </svg>
+              <h3>Web Login</h3>
+              <p style="color: var(--text-dim); font-size: 0.8rem">
+                Standard Protocol
+              </p>
             </div>
+            <div class="device-card" onclick="openInterface('idcard')">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.1.89 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.11-.9-2-2-2zm0 14H4V6h16v12zM6 10h2v2H6zm0 4h8v2H6zm10 0h2v2h-2zm-6-4h8v2h-8z"
+                />
+              </svg>
+              <h3>ID Card Access</h3>
+              <p style="color: var(--text-dim); font-size: 0.8rem">
+                RFID / NFC Swipe
+              </p>
+            </div>
+            <div class="device-card" onclick="openInterface('fingerprint')">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.44-5.58 1.41-.28.16-.64.07-.8-.21-.16-.28-.07-.64.21-.8C7.67 2.37 9.77 1.9 12.01 1.9c2.13 0 4.02.46 5.8 1.51.28.16.37.52.21.8-.08.13-.21.26-.21.26zm2.36 4.19c-.01 0-.02 0-.03-.01-.51-.12-1.01-.18-1.53-.18-.51 0-.99.06-1.47.17-.31.07-.62-.12-.69-.43-.07-.31.12-.62.43-.69.59-.13 1.16-.2 1.73-.2.58 0 1.15.06 1.71.19.31.07.51.38.44.69-.06.27-.3.46-.59.46zM12 7c-1.63 0-3.06.35-4.39 1.05-.28.15-.64.04-.79-.24-.15-.28-.04-.64.24-.79C8.55 6.26 10.16 5.9 12 5.9c1.86 0 3.42.34 4.93 1.02.29.13.41.48.28.77-.13.29-.48.41-.77.28C15.12 7.33 13.62 7 12 7zm7.44 3.91c.03-.01.05-.01.08-.01.3-.01.55.21.59.51.05.33-.18.64-.51.69-1.27.19-1.78.36-2.91.75-.3.1-.63-.06-.73-.36-.1-.3.06-.63.36-.73 1.25-.43 1.83-.62 3.12-.85zM12 11.5c-1.01 0-1.95.14-2.85.43-.3.1-.63-.07-.73-.36-.1-.3.07-.63.36-.73 1.05-.34 2.14-.52 3.22-.52 1.1 0 2.14.18 3.14.53.3.11.46.43.35.73-.11.3-.43.46-.73.35-.91-.32-1.84-.43-2.76-.43z"
+                />
+              </svg>
+              <h3>Fingerprint Scanner</h3>
+              <p style="color: var(--text-dim); font-size: 0.8rem">
+                Biometric ID
+              </p>
+            </div>
+            <div class="device-card" onclick="openInterface('printer')">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"
+                />
+              </svg>
+              <h3>Printer Access</h3>
+              <p style="color: var(--text-dim); font-size: 0.8rem">
+                Shared Services
+              </p>
+            </div>
+            <div class="device-card" onclick="openInterface('network')">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9L16.5 12 11 16.5z"
+                />
+              </svg>
+              <h3>Network Service</h3>
+              <p style="color: var(--text-dim); font-size: 0.8rem">
+                Custom Protocol
+              </p>
+            </div>
+          </div>
         </section>
 
         <!-- Web Login View -->
         <section id="view-web" class="view-section">
-            <div class="interface-panel">
-                <button class="back-btn" onclick="goBack()">&larr; BACK</button>
-                <h2 style="margin-bottom: 20px;">Web Authentication</h2>
-                
-                <!-- ADDED: Wrap inputs in a form div to toggle visibility -->
-                <div id="login-form">
-                    <div class="input-group">
-                        <label>Username</label>
-                        <input type="text" placeholder="admin_user">
-                    </div>
-                    <div class="input-group">
-                        <label>Security Password</label>
-                        <input type="password" placeholder="••••••••">
-                    </div>
-                    <div style="margin-bottom: 25px; padding: 15px; background: var(--bg-deep); border-radius: 6px;">
-                        <p style="font-size: 0.7rem; color: var(--text-dim);">IP: <span id="web-ip">127.0.0.1</span></p>
-                        <p style="font-size: 0.7rem; color: var(--text-dim);">FINGERPRINT: <span id="web-fp" style="color: var(--accent-cyan);"></span></p>
-                        <p style="font-size: 0.7rem; color: var(--text-dim);">WHITELIST: <span style="color: var(--accent-green);">TRUE</span></p>
-                    </div>
-                    <button class="primary-btn" onclick="simulateAuth('web')">Login</button>
-                </div>
+          <div class="interface-panel">
+            <button class="back-btn" onclick="goBack()">&larr; BACK</button>
+            <h2 style="margin-bottom: 20px">Web Authentication</h2>
 
-                <!-- ADDED: Hidden Logout Panel -->
-                <div id="logout-panel" class="hidden">
-                    <div style="text-align: center; padding: 20px; background: var(--bg-deep); border-radius: 6px; margin-bottom: 20px;">
-                        <h3 style="color: var(--accent-green); margin-bottom: 10px;">SESSION ACTIVE</h3>
-                        <p style="color: var(--text-dim);">Authenticated User:</p>
-                        <p style="color: var(--accent-cyan); font-family: monospace; font-size: 1.2rem;" id="active-user">---</p>
-                        <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 15px;">Session duration is being recorded in the secure ledger.</p>
-                    </div>
-                    <button class="primary-btn logout-btn" onclick="doLogout()">Terminate Session</button>
-                </div>
-
+            <div id="login-form">
+              <div class="input-group">
+                <label>Username</label>
+                <!-- ADDED id so JS can read it reliably -->
+                <input type="text" id="web-username" placeholder="admin_user" />
+              </div>
+              <div class="input-group">
+                <label>Security Password</label>
+                <input
+                  type="password"
+                  id="web-password"
+                  placeholder="••••••••"
+                />
+              </div>
+              <div
+                style="
+                  margin-bottom: 25px;
+                  padding: 15px;
+                  background: var(--bg-deep);
+                  border-radius: 6px;
+                "
+              >
+                <p style="font-size: 0.7rem; color: var(--text-dim)">
+                  IP: <span id="web-ip">127.0.0.1</span>
+                </p>
+                <p style="font-size: 0.7rem; color: var(--text-dim)">
+                  FINGERPRINT:
+                  <span id="web-fp" style="color: var(--accent-cyan)"></span>
+                </p>
+                <p style="font-size: 0.7rem; color: var(--text-dim)">
+                  WHITELIST:
+                  <span style="color: var(--accent-green)">TRUE</span>
+                </p>
+              </div>
+              <button class="primary-btn" onclick="simulateAuth('web')">
+                Login
+              </button>
             </div>
+
+            <div id="logout-panel" class="hidden">
+              <div
+                style="
+                  text-align: center;
+                  padding: 20px;
+                  background: var(--bg-deep);
+                  border-radius: 6px;
+                  margin-bottom: 20px;
+                "
+              >
+                <h3 style="color: var(--accent-green); margin-bottom: 10px">
+                  SESSION ACTIVE
+                </h3>
+                <p style="color: var(--text-dim)">Authenticated User:</p>
+                <p
+                  style="
+                    color: var(--accent-cyan);
+                    font-family: monospace;
+                    font-size: 1.2rem;
+                  "
+                  id="active-user"
+                >
+                  ---
+                </p>
+                <p
+                  style="
+                    font-size: 0.7rem;
+                    color: var(--text-dim);
+                    margin-top: 15px;
+                  "
+                >
+                  Session duration is being recorded in the secure ledger.
+                </p>
+              </div>
+              <button class="primary-btn logout-btn" onclick="doLogout()">
+                Terminate Session
+              </button>
+            </div>
+
+            <button class="attack-btn" onclick="runAttack('bruteforce')">
+              ⚠ Simulate Brute Force Attack ⚠
+            </button>
+            <!-- ADDED: rescue button -->
+            <button class="rescue-btn" onclick="openRescue()">
+              🚨 Rescue Mode — Emergency Access
+            </button>
+          </div>
         </section>
 
         <!-- ID Card View -->
         <section id="view-idcard" class="view-section">
-            <div class="interface-panel">
-                <button class="back-btn" onclick="goBack()">&larr; BACK</button>
-                <h2>ID Card Reader</h2>
-                <div class="input-group">
-                    <label>Select Controller IP</label>
-                    <select id="id-ip-select">
-                        <option>192.168.1.70</option>
-                        <option>192.168.1.71</option>
-                        <option>192.168.1.72</option>
-                    </select>
-                </div>
-                
-                <div class="reader-slot" id="id-reader">
-                    <div class="id-card">SCAN CARD</div>
-                </div>
+          <div class="interface-panel">
+            <button class="back-btn" onclick="goBack()">&larr; BACK</button>
+            <h2>ID Card Reader</h2>
 
-                <div id="id-status-text" style="text-align: center; font-size: 0.9rem; color: var(--text-dim);">Waiting for card swipe...</div>
-                <div class="spinner" id="id-spinner"></div>
-                
-                <button class="primary-btn" style="margin-top: 30px;" onclick="simulateIdSwipe()">Swipe Card</button>
+            <!-- ADDED: card-own credentials so it doesn't depend on web login -->
+            <div id="id-auth-form">
+              <div class="input-group">
+                <label>Card Holder ID / Username</label>
+                <input
+                  type="text"
+                  id="id-username"
+                  placeholder="e.g. card_user_01"
+                  value="admin"
+                />
+              </div>
+              <div class="input-group">
+                <label>Card PIN / Secret</label>
+                <input
+                  type="password"
+                  id="id-pin"
+                  placeholder="Card PIN"
+                  value="password"
+                />
+              </div>
             </div>
+
+            <div class="input-group">
+              <label>Select Controller IP</label>
+              <select id="id-ip-select">
+                <option>192.168.1.70</option>
+                <option>192.168.1.71</option>
+                <option>192.168.1.72</option>
+              </select>
+            </div>
+
+            <div class="reader-slot" id="id-reader">
+              <div class="id-card" id="id-card-display">SCAN CARD</div>
+            </div>
+
+            <div
+              id="id-status-text"
+              style="
+                text-align: center;
+                font-size: 0.9rem;
+                color: var(--text-dim);
+              "
+            >
+              Waiting for card swipe...
+            </div>
+            <div class="spinner" id="id-spinner"></div>
+
+            <!-- ID Card Active Session Panel (hidden until auth) -->
+            <div id="id-session-panel" class="hidden" style="margin-top: 20px">
+              <div class="session-info-box">
+                <p>CARD HOLDER: <span id="id-card-holder">admin</span></p>
+                <p>CONTROLLER IP: <span id="id-session-ip">---</span></p>
+                <p>LOGIN TIME: <span id="id-login-time">---</span></p>
+                <p>EXPIRY TIME: <span id="id-expiry-time">---</span></p>
+                <p>SESSION EXPIRES IN:</p>
+                <div class="session-countdown" id="id-countdown">08:00:00</div>
+              </div>
+              <button
+                class="primary-btn logout-btn"
+                onclick="terminateIdSession()"
+              >
+                Terminate Card Session
+              </button>
+            </div>
+
+            <!-- Session Log -->
+            <div class="session-log" id="id-session-log">
+              <div class="session-log-title">Session Log</div>
+              <div id="id-log-entries">
+                <div style="color: var(--text-dim); font-size: 0.75rem">
+                  No sessions recorded yet.
+                </div>
+              </div>
+            </div>
+
+            <button
+              class="primary-btn"
+              style="margin-top: 30px"
+              id="id-swipe-btn"
+              onclick="simulateIdSwipe()"
+            >
+              Swipe Card
+            </button>
+
+            <button class="attack-btn" onclick="runAttack('unauthorized')">
+              ⚠ Simulate Unauthorized Access ⚠
+            </button>
+            <!-- ADDED: rescue button -->
+            <button class="rescue-btn" onclick="openRescue()">
+              🚨 Rescue Mode — Emergency Access
+            </button>
+          </div>
         </section>
 
         <!-- Fingerprint View -->
         <section id="view-fingerprint" class="view-section">
-            <div class="interface-panel">
-                <button class="back-btn" onclick="goBack()">&larr; BACK</button>
-                <h2 style="text-align: center; margin-bottom: 30px;">Biometric Scan</h2>
-                
-                <div class="fingerprint-container" id="fp-scanner" onclick="startFingerprintScan()">
-                    <div class="scanner-ring"></div>
-                    <svg class="fingerprint-svg" viewBox="0 0 24 24"><path d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.44-5.58 1.41-.28.16-.64.07-.8-.21-.16-.28-.07-.64.21-.8C7.67 2.37 9.77 1.9 12.01 1.9c2.13 0 4.02.46 5.8 1.51.28.16.37.52.21.8-.08.13-.21.26-.21.26zm2.36 4.19c-.01 0-.02 0-.03-.01-.51-.12-1.01-.18-1.53-.18-.51 0-.99.06-1.47.17-.31.07-.62-.12-.69-.43-.07-.31.12-.62.43-.69.59-.13 1.16-.2 1.73-.2.58 0 1.15.06 1.71.19.31.07.51.38.44.69-.06.27-.3.46-.59.46zM12 7c-1.63 0-3.06.35-4.39 1.05-.28.15-.64.04-.79-.24-.15-.28-.04-.64.24-.79C8.55 6.26 10.16 5.9 12 5.9c1.86 0 3.42.34 4.93 1.02.29.13.41.48.28.77-.13.29-.48.41-.77.28C15.12 7.33 13.62 7 12 7zm7.44 3.91c.03-.01.05-.01.08-.01.3-.01.55.21.59.51.05.33-.18.64-.51.69-1.27.19-1.78.36-2.91.75-.3.1-.63-.06-.73-.36-.1-.3.06-.63.36-.73 1.25-.43 1.83-.62 3.12-.85zM12 11.5c-1.01 0-1.95.14-2.85.43-.3.1-.63-.07-.73-.36-.1-.3.07-.63.36-.73 1.05-.34 2.14-.52 3.22-.52 1.1 0 2.14.18 3.14.53.3.11.46.43.35.73-.11.3-.43.46-.73.35-.91-.32-1.84-.43-2.76-.43z"/></svg>
-                </div>
+          <div class="interface-panel">
+            <button class="back-btn" onclick="goBack()">&larr; BACK</button>
+            <h2 style="text-align: center; margin-bottom: 30px">
+              Biometric Scan
+            </h2>
 
-                <div id="fp-status-text" style="text-align: center; font-size: 0.9rem; color: var(--text-dim);">Place finger on scanner</div>
-                <p style="text-align: center; font-size: 0.7rem; color: var(--text-dim); margin-top: 10px;">AUTH IP: 192.168.1.60</p>
+            <!-- ADDED: staff ID input so fingerprint auth is self-contained -->
+            <div id="fp-auth-form" style="margin-bottom: 10px">
+              <div class="input-group">
+                <label>Staff ID (from biometric hardware)</label>
+                <input
+                  type="text"
+                  id="fp-staff-input"
+                  placeholder="e.g. bio_staff_001"
+                  value="bio_staff_001"
+                />
+              </div>
             </div>
+
+            <div
+              class="fingerprint-container"
+              id="fp-scanner"
+              onclick="startFingerprintScan()"
+            >
+              <div class="scanner-ring"></div>
+              <svg class="fingerprint-svg" viewBox="0 0 24 24">
+                <path
+                  d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.44-5.58 1.41-.28.16-.64.07-.8-.21-.16-.28-.07-.64.21-.8C7.67 2.37 9.77 1.9 12.01 1.9c2.13 0 4.02.46 5.8 1.51.28.16.37.52.21.8-.08.13-.21.26-.21.26zm2.36 4.19c-.01 0-.02 0-.03-.01-.51-.12-1.01-.18-1.53-.18-.51 0-.99.06-1.47.17-.31.07-.62-.12-.69-.43-.07-.31.12-.62.43-.69.59-.13 1.16-.2 1.73-.2.58 0 1.15.06 1.71.19.31.07.51.38.44.69-.06.27-.3.46-.59.46zM12 7c-1.63 0-3.06.35-4.39 1.05-.28.15-.64.04-.79-.24-.15-.28-.04-.64.24-.79C8.55 6.26 10.16 5.9 12 5.9c1.86 0 3.42.34 4.93 1.02.29.13.41.48.28.77-.13.29-.48.41-.77.28C15.12 7.33 13.62 7 12 7zm7.44 3.91c.03-.01.05-.01.08-.01.3-.01.55.21.59.51.05.33-.18.64-.51.69-1.27.19-1.78.36-2.91.75-.3.1-.63-.06-.73-.36-.1-.3.06-.63.36-.73 1.25-.43 1.83-.62 3.12-.85zM12 11.5c-1.01 0-1.95.14-2.85.43-.3.1-.63-.07-.73-.36-.1-.3.07-.63.36-.73 1.05-.34 2.14-.52 3.22-.52 1.1 0 2.14.18 3.14.53.3.11.46.43.35.73-.11.3-.43.46-.73.35-.91-.32-1.84-.43-2.76-.43z"
+                />
+              </svg>
+            </div>
+
+            <div
+              id="fp-status-text"
+              style="
+                text-align: center;
+                font-size: 0.9rem;
+                color: var(--text-dim);
+              "
+            >
+              Place finger on scanner
+            </div>
+            <p
+              style="
+                text-align: center;
+                font-size: 0.7rem;
+                color: var(--text-dim);
+                margin-top: 10px;
+              "
+            >
+              AUTH IP: N/A (Direct Line)
+            </p>
+
+            <!-- Fingerprint Active Session Panel (hidden until auth) -->
+            <div id="fp-session-panel" class="hidden" style="margin-top: 20px">
+              <div class="session-info-box">
+                <p>STAFF ID: <span id="fp-staff-id">bio_staff_001</span></p>
+                <p>AUTH METHOD: <span>BIOMETRIC — No IP Assigned</span></p>
+                <p>LOGIN TIME: <span id="fp-login-time">---</span></p>
+                <p>EXPIRY TIME: <span id="fp-expiry-time">---</span></p>
+                <p class="warn-text">⚠ Session auto-terminates after 8 hours</p>
+                <p>SESSION EXPIRES IN:</p>
+                <div class="session-countdown" id="fp-countdown">08:00:00</div>
+              </div>
+              <button
+                class="primary-btn logout-btn"
+                onclick="terminateFpSession()"
+              >
+                Terminate Biometric Session
+              </button>
+            </div>
+
+            <!-- Session Log -->
+            <div
+              class="session-log"
+              id="fp-session-log"
+              style="margin-top: 15px"
+            >
+              <div class="session-log-title">Biometric Session Log</div>
+              <div id="fp-log-entries">
+                <div style="color: var(--text-dim); font-size: 0.75rem">
+                  No sessions recorded yet.
+                </div>
+              </div>
+            </div>
+
+            <button class="attack-btn" onclick="runAttack('session_theft')">
+              ⚠ Simulate Session Hijack ⚠
+            </button>
+            <!-- ADDED: rescue button -->
+            <button class="rescue-btn" onclick="openRescue()">
+              🚨 Rescue Mode — Emergency Access
+            </button>
+          </div>
         </section>
 
         <!-- Printer View -->
         <section id="view-printer" class="view-section">
-            <div class="interface-panel">
-                <button class="back-btn" onclick="goBack()">&larr; BACK</button>
-                <div style="text-align: center;">
-                    <div class="ping-container" id="ping-box">
-                        <div class="ripple"></div>
-                        <div class="ripple" style="animation-delay: 0.5s;"></div>
-                        <svg style="width: 50px; fill: var(--accent-cyan); position: relative; z-index: 5;" viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
-                    </div>
-                    <h2>Printer Network Status</h2>
-                </div>
-
-                <div class="input-group" style="margin-top: 30px;">
-                    <label>Printer Hub IP</label>
-                    <select id="printer-ip-select">
-                        <option>192.168.1.50</option>
-                        <option>192.168.1.51</option>
-                    </select>
-                </div>
-                
-                <div id="printer-status-box" style="padding: 15px; border-radius: 6px; text-align: center; margin-bottom: 20px; background: #1c2128;">
-                    STATUS: <span id="printer-status-val" style="color: var(--text-dim);">IDLE</span>
-                </div>
-
-                <button class="primary-btn" onclick="pingPrinter()">Check Connectivity</button>
+          <div class="interface-panel">
+            <button class="back-btn" onclick="goBack()">&larr; BACK</button>
+            <div style="text-align: center">
+              <div class="ping-container" id="ping-box">
+                <div class="ripple"></div>
+                <div class="ripple" style="animation-delay: 0.5s"></div>
+                <svg
+                  style="
+                    width: 50px;
+                    fill: var(--accent-cyan);
+                    position: relative;
+                    z-index: 5;
+                  "
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"
+                  />
+                </svg>
+              </div>
+              <h2>Printer Network Status</h2>
             </div>
+
+            <div class="input-group" style="margin-top: 30px">
+              <label>Printer Hub IP</label>
+              <select id="printer-ip-select">
+                <option>192.168.1.50</option>
+                <option>192.168.1.51</option>
+              </select>
+            </div>
+
+            <div
+              id="printer-status-box"
+              style="
+                padding: 15px;
+                border-radius: 6px;
+                text-align: center;
+                margin-bottom: 20px;
+                background: #1c2128;
+              "
+            >
+              STATUS:
+              <span id="printer-status-val" style="color: var(--text-dim)"
+                >IDLE</span
+              >
+            </div>
+
+            <button class="primary-btn" onclick="pingPrinter()">
+              Check Connectivity
+            </button>
+
+            <button class="attack-btn" onclick="runAttack('tampering')">
+              ⚠ Simulate Ledger Tampering ⚠
+            </button>
+            <!-- ADDED: rescue button -->
+            <button class="rescue-btn" onclick="openRescue()">
+              🚨 Rescue Mode — Emergency Access
+            </button>
+          </div>
         </section>
 
         <!-- Network View -->
         <section id="view-network" class="view-section">
-            <div class="interface-panel">
-                <button class="back-btn" onclick="goBack()">&larr; BACK</button>
-                <h2>Custom Service Test</h2>
-                <div class="input-group">
-                    <label>Manual IP Address</label>
-                    <input type="text" id="manual-ip" placeholder="e.g. 10.0.0.1">
-                </div>
-                <div class="input-group">
-                    <label>Port</label>
-                    <input type="number" id="manual-port" placeholder="8080">
-                </div>
-                <div class="spinner" id="net-spinner" style="display: block; opacity: 0;"></div>
-                <div id="net-result" style="text-align: center; margin: 10px 0;"></div>
-                <button class="primary-btn" onclick="testConnection()">Test TCP Connection</button>
+          <div class="interface-panel">
+            <button class="back-btn" onclick="goBack()">&larr; BACK</button>
+            <h2>Custom Service Test</h2>
+            <div class="input-group">
+              <label>Manual IP Address</label>
+              <input type="text" id="manual-ip" placeholder="e.g. 10.0.0.1" />
             </div>
+            <div class="input-group">
+              <label>Port</label>
+              <input type="number" id="manual-port" placeholder="8080" />
+            </div>
+            <div
+              class="spinner"
+              id="net-spinner"
+              style="display: block; opacity: 0"
+            ></div>
+            <div
+              id="net-result"
+              style="text-align: center; margin: 10px 0"
+            ></div>
+            <button class="primary-btn" onclick="testConnection()">
+              Test TCP Connection
+            </button>
+
+            <button class="attack-btn" onclick="runAttack('flood')">
+              ⚠ Simulate Flood Attack (DOS) ⚠
+            </button>
+            <!-- ADDED: rescue button -->
+            <button class="rescue-btn" onclick="openRescue()">
+              🚨 Rescue Mode — Emergency Access
+            </button>
+          </div>
         </section>
+      </main>
 
-    </main>
-
-    <!-- Right Sidebar Status -->
-    <aside class="status-panel">
+      <!-- Right Sidebar Status -->
+      <aside class="status-panel">
         <div class="status-header">System Metrics</div>
-        
+
         <div class="status-item">
-            <span class="status-label">Active Node</span>
-            <span class="status-value" id="stat-node">None</span>
-        </div>
-        
-        <div class="status-item">
-            <span class="status-label">Assigned IP</span>
-            <span class="status-value" id="stat-ip">---.---.---.---</span>
+          <span class="status-label">Active Node</span>
+          <span class="status-value" id="stat-node">None</span>
         </div>
 
         <div class="status-item">
-            <span class="status-label">Auth Status</span>
-            <span class="status-value" id="stat-auth">PENDING</span>
+          <span class="status-label">Assigned IP</span>
+          <span class="status-value" id="stat-ip">---.---.---.---</span>
         </div>
 
         <div class="status-item">
-            <span class="status-label">Connection</span>
-            <span class="status-value" id="stat-conn">STABLE</span>
+          <span class="status-label">Auth Status</span>
+          <span class="status-value" id="stat-auth">PENDING</span>
+        </div>
+
+        <div class="status-item">
+          <span class="status-label">Connection</span>
+          <span class="status-value" id="stat-conn">STABLE</span>
         </div>
 
         <div class="status-header">Threat Level</div>
         <div class="threat-indicator">
-            <div class="threat-bar" id="threat-bar" style="background: var(--accent-green); width: 10%;"></div>
-            <span style="position: relative; z-index: 2; font-size: 0.7rem; font-weight: bold;" id="threat-text">LOW</span>
+          <div
+            class="threat-bar"
+            id="threat-bar"
+            style="background: var(--accent-green); width: 10%"
+          ></div>
+          <span
+            style="
+              position: relative;
+              z-index: 2;
+              font-size: 0.7rem;
+              font-weight: bold;
+            "
+            id="threat-text"
+            >LOW</span
+          >
+        </div>
+
+        <div class="status-header">Active Sessions</div>
+        <div class="status-item">
+          <span class="status-label">ID Card Session</span>
+          <span
+            class="status-value"
+            id="sidebar-id-session"
+            style="color: var(--text-dim)"
+            >NONE</span
+          >
+        </div>
+        <div class="status-item">
+          <span class="status-label">Biometric Session</span>
+          <span
+            class="status-value"
+            id="sidebar-fp-session"
+            style="color: var(--text-dim)"
+            >NONE</span
+          >
         </div>
 
         <div class="status-header">Timestamp</div>
-        <div class="status-value" id="live-clock-sidebar" style="font-size: 1.1rem;">00:00:00</div>
-    </aside>
-</div>
+        <div
+          class="status-value"
+          id="live-clock-sidebar"
+          style="font-size: 1.1rem"
+        >
+          00:00:00
+        </div>
 
-<script>
-/* ==============================
+        <!-- ADDED: rescue button in sidebar -->
+        <div style="margin-top: auto; padding-top: 10px">
+          <button
+            onclick="openRescue()"
+            style="
+              width: 100%;
+              padding: 10px;
+              background: transparent;
+              border: 1px solid var(--accent-orange);
+              color: var(--accent-orange);
+              border-radius: 6px;
+              cursor: pointer;
+              font-size: 0.75rem;
+              font-weight: bold;
+              letter-spacing: 1px;
+              transition: var(--transition);
+            "
+            onmouseover="
+              this.style.background = 'var(--accent-orange)';
+              this.style.color = 'white';
+            "
+            onmouseout="
+              this.style.background = 'transparent';
+              this.style.color = 'var(--accent-orange)';
+            "
+          >
+            🚨 RESCUE MODE
+          </button>
+        </div>
+      </aside>
+    </div>
+
+    <script>
+      /* ==============================
    GLOBAL CONFIG
 ============================== */
 
-const BASE_URL = "http://192.168.1.86:5001";
+      const BASE_URL = "http://192.168.1.86:5001"; // Change to your backend URL
 
-const state = {
-    currentNode: 'Selection',
-    currentIP: 'N/A',
-    authStatus: 'PENDING',
-    threatLevel: 'LOW'
-};
+      const state = {
+        currentNode: "Selection",
+        currentIP: "N/A",
+        authStatus: "PENDING",
+        threatLevel: "LOW",
+      };
 
-/* ==============================
+      /* ==============================
+   SESSION STATE — ID CARD & FINGERPRINT
+   Stores login info locally (in-memory) as well as sent to backend.
+============================== */
+
+      const sessions = {
+        idCard: {
+          active: false,
+          staffId: null,
+          cardIp: null,
+          loginTime: null, // Date object
+          expiryTime: null, // Date object (loginTime + 8h)
+          countdownInterval: null, // setInterval reference
+          log: [], // array of session records
+        },
+        fingerprint: {
+          active: false,
+          staffId: null,
+          loginTime: null, // Date object
+          expiryTime: null, // Date object (loginTime + 8h)
+          countdownInterval: null, // setInterval reference
+          log: [], // array of session records
+        },
+        /* ADDED: track web session for persistence */
+        web: { active: false, username: null },
+      };
+
+      const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+
+      /* ==============================
+   ADDED: sessionStorage persistence
+   Saves all session state so a page refresh restores the
+   active session instead of resetting everything to logged-out.
+============================== */
+
+      function saveToStorage() {
+        const data = {
+          web: { active: sessions.web.active, username: sessions.web.username },
+          idCard: {
+            active: sessions.idCard.active,
+            staffId: sessions.idCard.staffId,
+            cardIp: sessions.idCard.cardIp,
+            loginTime: sessions.idCard.loginTime
+              ? sessions.idCard.loginTime.toISOString()
+              : null,
+            expiryTime: sessions.idCard.expiryTime
+              ? sessions.idCard.expiryTime.toISOString()
+              : null,
+            log: sessions.idCard.log.map((l) => ({
+              ...l,
+              loginTime: l.loginTime ? l.loginTime.toISOString() : null,
+              expiryTime: l.expiryTime ? l.expiryTime.toISOString() : null,
+              logoutTime: l.logoutTime ? l.logoutTime.toISOString() : null,
+            })),
+          },
+          fingerprint: {
+            active: sessions.fingerprint.active,
+            staffId: sessions.fingerprint.staffId,
+            loginTime: sessions.fingerprint.loginTime
+              ? sessions.fingerprint.loginTime.toISOString()
+              : null,
+            expiryTime: sessions.fingerprint.expiryTime
+              ? sessions.fingerprint.expiryTime.toISOString()
+              : null,
+            log: sessions.fingerprint.log.map((l) => ({
+              ...l,
+              loginTime: l.loginTime ? l.loginTime.toISOString() : null,
+              expiryTime: l.expiryTime ? l.expiryTime.toISOString() : null,
+              logoutTime: l.logoutTime ? l.logoutTime.toISOString() : null,
+            })),
+          },
+        };
+        sessionStorage.setItem("securecore_sessions", JSON.stringify(data));
+      }
+
+      function loadFromStorage() {
+        const raw = sessionStorage.getItem("securecore_sessions");
+        if (!raw) return;
+        try {
+          const data = JSON.parse(raw);
+          if (data.web) {
+            sessions.web.active = data.web.active;
+            sessions.web.username = data.web.username;
+          }
+          if (data.idCard) {
+            sessions.idCard.active = data.idCard.active;
+            sessions.idCard.staffId = data.idCard.staffId;
+            sessions.idCard.cardIp = data.idCard.cardIp;
+            sessions.idCard.loginTime = data.idCard.loginTime
+              ? new Date(data.idCard.loginTime)
+              : null;
+            sessions.idCard.expiryTime = data.idCard.expiryTime
+              ? new Date(data.idCard.expiryTime)
+              : null;
+            sessions.idCard.log = (data.idCard.log || []).map((l) => ({
+              ...l,
+              loginTime: l.loginTime ? new Date(l.loginTime) : null,
+              expiryTime: l.expiryTime ? new Date(l.expiryTime) : null,
+              logoutTime: l.logoutTime ? new Date(l.logoutTime) : null,
+            }));
+          }
+          if (data.fingerprint) {
+            sessions.fingerprint.active = data.fingerprint.active;
+            sessions.fingerprint.staffId = data.fingerprint.staffId;
+            sessions.fingerprint.loginTime = data.fingerprint.loginTime
+              ? new Date(data.fingerprint.loginTime)
+              : null;
+            sessions.fingerprint.expiryTime = data.fingerprint.expiryTime
+              ? new Date(data.fingerprint.expiryTime)
+              : null;
+            sessions.fingerprint.log = (data.fingerprint.log || []).map(
+              (l) => ({
+                ...l,
+                loginTime: l.loginTime ? new Date(l.loginTime) : null,
+                expiryTime: l.expiryTime ? new Date(l.expiryTime) : null,
+                logoutTime: l.logoutTime ? new Date(l.logoutTime) : null,
+              }),
+            );
+          }
+        } catch (e) {
+          console.warn("Session storage corrupted, resetting:", e);
+          sessionStorage.removeItem("securecore_sessions");
+        }
+      }
+
+      function restoreUI() {
+        // Restore web session
+        if (sessions.web.active && sessions.web.username) {
+          document.getElementById("login-form").classList.add("hidden");
+          document.getElementById("logout-panel").classList.remove("hidden");
+          document.getElementById("active-user").innerText =
+            sessions.web.username;
+          state.authStatus = "VERIFIED";
+        }
+        // Restore ID card session — only if still valid time-wise
+        if (sessions.idCard.active && sessions.idCard.expiryTime) {
+          const remaining = sessions.idCard.expiryTime - new Date();
+          if (remaining > 0) {
+            document.getElementById("id-card-holder").innerText =
+              sessions.idCard.staffId || "---";
+            document.getElementById("id-session-ip").innerText =
+              sessions.idCard.cardIp || "---";
+            document.getElementById("id-login-time").innerText = formatDateTime(
+              sessions.idCard.loginTime,
+            );
+            document.getElementById("id-expiry-time").innerText =
+              formatDateTime(sessions.idCard.expiryTime);
+            document
+              .getElementById("id-session-panel")
+              .classList.remove("hidden");
+            document.getElementById("id-auth-form").classList.add("hidden");
+            document.getElementById("id-swipe-btn").classList.add("hidden");
+            document.getElementById("id-status-text").innerHTML =
+              '<span class="success-msg">SESSION RESTORED — ACCESS GRANTED</span>';
+            startIdCountdown();
+          } else {
+            // Expired while page was closed — clean up silently
+            sessions.idCard.active = false;
+            saveToStorage();
+          }
+        }
+        // Restore fingerprint session — only if still valid
+        if (sessions.fingerprint.active && sessions.fingerprint.expiryTime) {
+          const remaining = sessions.fingerprint.expiryTime - new Date();
+          if (remaining > 0) {
+            document.getElementById("fp-staff-id").innerText =
+              sessions.fingerprint.staffId || "---";
+            document.getElementById("fp-login-time").innerText = formatDateTime(
+              sessions.fingerprint.loginTime,
+            );
+            document.getElementById("fp-expiry-time").innerText =
+              formatDateTime(sessions.fingerprint.expiryTime);
+            document
+              .getElementById("fp-session-panel")
+              .classList.remove("hidden");
+            document.getElementById("fp-auth-form").classList.add("hidden");
+            document.getElementById("fp-status-text").innerHTML =
+              '<span class="success-msg">SESSION RESTORED — IDENTITY VERIFIED</span>';
+            startFpCountdown();
+          } else {
+            sessions.fingerprint.active = false;
+            saveToStorage();
+          }
+        }
+        renderIdSessionLog();
+        renderFpSessionLog();
+        updateSidebar();
+      }
+
+      /* ==============================
+   HELPERS
+============================== */
+
+      function formatDateTime(date) {
+        if (!date) return "---";
+        return date.toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        });
+      }
+
+      function formatCountdown(ms) {
+        if (ms <= 0) return "00:00:00";
+        const totalSeconds = Math.floor(ms / 1000);
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+        return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+      }
+
+      /* ==============================
    INIT
 ============================== */
 
-function init() {
-    updateClock();
-    setInterval(updateClock, 1000);
-    generateFingerprint();
-    setInterval(checkBackendStatus, 8000);
-}
+      function init() {
+        updateClock();
+        setInterval(updateClock, 1000);
+        generateFingerprint();
+        setInterval(checkBackendStatus, 5000);
+        /* ADDED: restore sessions from storage on every page load */
+        loadFromStorage();
+        restoreUI();
+      }
 
-/* ==============================
+      /* ==============================
    CLOCK
 ============================== */
 
-function updateClock() {
-    const now = new Date();
-    const timeStr = now.toTimeString().split(' ')[0];
-    document.getElementById('live-clock').innerText = timeStr;
-    document.getElementById('live-clock-sidebar').innerText = timeStr;
-}
+      function updateClock() {
+        const now = new Date();
+        const timeStr = now.toTimeString().split(" ")[0];
+        document.getElementById("live-clock").innerText = timeStr;
+        document.getElementById("live-clock-sidebar").innerText = timeStr;
+      }
 
-/* ==============================
+      /* ==============================
    FINGERPRINT DISPLAY
 ============================== */
 
-function generateFingerprint() {
-    const hex = '0123456789ABCDEF';
-    let res = '';
-    for(let i=0; i<16; i++) res += hex[Math.floor(Math.random()*16)];
-    document.getElementById('web-fp').innerText = 'SEC-' + res;
-}
+      function generateFingerprint() {
+        const hex = "0123456789ABCDEF";
+        let res = "";
+        for (let i = 0; i < 16; i++) res += hex[Math.floor(Math.random() * 16)];
+        document.getElementById("web-fp").innerText = "SEC-" + res;
+      }
 
-/* ==============================
+      /* ==============================
    NAVIGATION
 ============================== */
 
-function openInterface(id) {
-    document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
-    document.getElementById('view-' + id).classList.add('active');
-    state.currentNode = id.toUpperCase();
-    updateSidebar();
-}
+      function openInterface(id) {
+        document
+          .querySelectorAll(".view-section")
+          .forEach((s) => s.classList.remove("active"));
+        document.getElementById("view-" + id).classList.add("active");
+        state.currentNode = id.toUpperCase();
+        updateSidebar();
+      }
 
-function goBack() {
-    document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
-    document.getElementById('view-selection').classList.add('active');
-    state.currentNode = 'Selection';
-    state.currentIP = 'N/A';
-    state.authStatus = 'PENDING';
-    updateSidebar();
-}
+      function goBack() {
+        document
+          .querySelectorAll(".view-section")
+          .forEach((s) => s.classList.remove("active"));
+        document.getElementById("view-selection").classList.add("active");
+        state.currentNode = "Selection";
+        state.currentIP = "N/A";
+        state.authStatus = "PENDING";
+        updateSidebar();
+      }
 
-/* ==============================
+      /* ==============================
    SIDEBAR UPDATE
 ============================== */
 
-function updateSidebar() {
-    document.getElementById('stat-node').innerText = state.currentNode;
-    document.getElementById('stat-ip').innerText = state.currentIP;
-    document.getElementById('stat-auth').innerText = state.authStatus;
+      function updateSidebar() {
+        document.getElementById("stat-node").innerText = state.currentNode;
+        document.getElementById("stat-ip").innerText = state.currentIP;
+        document.getElementById("stat-auth").innerText = state.authStatus;
 
-    const bar = document.getElementById('threat-bar');
-    const txt = document.getElementById('threat-text');
+        const bar = document.getElementById("threat-bar");
+        const txt = document.getElementById("threat-text");
 
-    if(state.threatLevel === 'LOW') {
-        bar.style.width = '15%';
-        bar.style.backgroundColor = 'var(--accent-green)';
-        txt.innerText = 'LOW';
-        txt.style.color = 'white';
-    } 
-    else if(state.threatLevel === 'MEDIUM') {
-        bar.style.width = '50%';
-        bar.style.backgroundColor = 'yellow';
-        txt.innerText = 'ELEVATED';
-        txt.style.color = 'black';
-    } 
-    else {
-        bar.style.width = '90%';
-        bar.style.backgroundColor = 'var(--accent-red)';
-        txt.innerText = 'CRITICAL';
-        txt.style.color = 'white';
-    }
-}
+        if (state.threatLevel === "LOW") {
+          bar.style.width = "15%";
+          bar.style.backgroundColor = "var(--accent-green)";
+          txt.innerText = "LOW";
+          txt.style.color = "white";
+        } else if (state.threatLevel === "MEDIUM") {
+          bar.style.width = "50%";
+          bar.style.backgroundColor = "yellow";
+          txt.innerText = "ELEVATED";
+          txt.style.color = "black";
+        } else {
+          bar.style.width = "90%";
+          bar.style.backgroundColor = "var(--accent-red)";
+          txt.innerText = "CRITICAL";
+          txt.style.color = "white";
+        }
 
-/* ==============================
-   REAL LOGIN (BACKEND CONNECTED)
+        // Update sidebar session indicators
+        const idEl = document.getElementById("sidebar-id-session");
+        if (sessions.idCard.active) {
+          idEl.innerText = sessions.idCard.staffId || "ACTIVE";
+          idEl.style.color = "var(--accent-green)";
+        } else {
+          idEl.innerText = "NONE";
+          idEl.style.color = "var(--text-dim)";
+        }
+
+        const fpEl = document.getElementById("sidebar-fp-session");
+        if (sessions.fingerprint.active) {
+          fpEl.innerText = sessions.fingerprint.staffId || "ACTIVE";
+          fpEl.style.color = "var(--accent-green)";
+        } else {
+          fpEl.innerText = "NONE";
+          fpEl.style.color = "var(--text-dim)";
+        }
+      }
+
+      /* ==============================
+   WEB LOGIN (STANDARD)
 ============================== */
 
-async function simulateAuth() {
+      async function simulateAuth() {
+        /* FIXED: use id-based selectors so values are always read correctly */
+        const username = document.getElementById("web-username").value;
+        const password = document.getElementById("web-password").value;
 
-    const username = document.querySelector('#view-web input[type="text"]').value;
-    const password = document.querySelector('#view-web input[type="password"]').value;
+        state.currentIP = "127.0.0.1";
+        updateSidebar();
 
-    state.currentIP = "127.0.0.1";
-    updateSidebar();
-
-    try {
-        const response = await fetch(BASE_URL + "/login", {
+        try {
+          const response = await fetch(BASE_URL + "/login", {
             method: "POST",
             credentials: "include",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ username, password })
-        });
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+          });
 
-        const data = await response.json();
+          const data = await response.json();
 
-        if (response.ok) {
+          if (response.ok) {
             state.authStatus = "VERIFIED";
-            alert("Login Successful ✅");
-            
-            // ADDED: Switch UI to Logout Panel
-            document.getElementById('login-form').classList.add('hidden');
-            document.getElementById('logout-panel').classList.remove('hidden');
-            document.getElementById('active-user').innerText = username;
-            
-        } else {
+            /* ADDED: persist web session */
+            sessions.web.active = true;
+            sessions.web.username = username;
+            saveToStorage();
+
+            alert("Login Successful ✅\nSession recorded in SQL.");
+            document.getElementById("login-form").classList.add("hidden");
+            document.getElementById("logout-panel").classList.remove("hidden");
+            document.getElementById("active-user").innerText = username;
+          } else {
             state.authStatus = "DENIED";
             alert(data.error || "Login Failed");
+          }
+        } catch (err) {
+          state.authStatus = "ERROR";
+          alert("Backend not reachable");
         }
 
-    } catch (err) {
-        state.authStatus = "ERROR";
-        alert("Backend not reachable");
-    }
+        updateSidebar();
+      }
 
-    updateSidebar();
-}
-
-/* ==============================
-   ADDED: LOGOUT FUNCTION
+      /* ==============================
+   LOGOUT FUNCTION
 ============================== */
 
-async function doLogout() {
-    try {
-        const response = await fetch(BASE_URL + "/logout", { 
+      async function doLogout() {
+        try {
+          const response = await fetch(BASE_URL + "/logout", {
             method: "POST",
-            credentials: "include"
-        });
-        
-        if (response.ok) {
-            state.authStatus = "CLOSED";
-            
-            // Switch UI back to Login Form
-            document.getElementById('login-form').classList.remove('hidden');
-            document.getElementById('logout-panel').classList.add('hidden');
-            
-            // Clear password
-            document.querySelector('#view-web input[type="password"]').value = '';
-            
-            alert("Session Closed - Duration Logged in SQL");
-        }
-    } catch(e) {
-        console.error(e);
-        alert("Logout failed");
-    }
-    updateSidebar();
-}
+            credentials: "include",
+          });
 
-/* ==============================
-   PRINTER STATUS (REAL API)
+          if (response.ok) {
+            state.authStatus = "CLOSED";
+            /* ADDED: clear web session from storage */
+            sessions.web.active = false;
+            sessions.web.username = null;
+            saveToStorage();
+
+            document.getElementById("login-form").classList.remove("hidden");
+            document.getElementById("logout-panel").classList.add("hidden");
+            document.getElementById("web-password").value = "";
+            alert("Session Closed - Duration Logged in SQL");
+          }
+        } catch (e) {
+          console.error(e);
+          alert("Logout failed");
+        }
+        updateSidebar();
+      }
+
+      /* ==============================
+   ID CARD SWIPE
+   FIXED: now uses its own username/pin inputs — does NOT require
+   a prior web login. The card authenticates independently.
+   - Records login time, controller IP, card holder
+   - Starts 8-hour countdown
+   - Auto-terminates session on expiry
 ============================== */
 
-async function pingPrinter() {
+      async function simulateIdSwipe() {
+        // Prevent double-swipe if session already active
+        if (sessions.idCard.active) {
+          alert(
+            "A card session is already active. Terminate the current session first.",
+          );
+          return;
+        }
 
-    const ip = document.getElementById('printer-ip-select').value;
-    state.currentIP = ip;
-    updateSidebar();
+        const reader = document.getElementById("id-reader");
+        const statusText = document.getElementById("id-status-text");
+        const spinner = document.getElementById("id-spinner");
+        const swipeBtn = document.getElementById("id-swipe-btn");
 
-    try {
-        const response = await fetch(BASE_URL + "/api/monitor", {
-            credentials: "include"
+        /* FIXED: read card-specific credentials */
+        const cardUsername =
+          document.getElementById("id-username").value.trim() || "card_user";
+        const cardPin = document.getElementById("id-pin").value.trim() || "";
+        const controllerIP = document.getElementById("id-ip-select").value;
+
+        reader.classList.add("swipe-active");
+        spinner.style.display = "block";
+        statusText.innerText = "Authenticating...";
+        swipeBtn.disabled = true;
+
+        state.currentIP = controllerIP;
+        updateSidebar();
+
+        try {
+          const now = new Date();
+          const response = await fetch(BASE_URL + "/login", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              card_id: cardUsername,
+            }),
+          });
+
+          if (response.ok) {
+            // --- Store session info ---
+            const expiry = new Date(now.getTime() + SESSION_DURATION_MS);
+
+            sessions.idCard.active = true;
+            sessions.idCard.staffId = cardUsername;
+            sessions.idCard.cardIp = controllerIP;
+            sessions.idCard.loginTime = now;
+            sessions.idCard.expiryTime = expiry;
+            saveToStorage(); /* ADDED */
+
+            // Update UI fields
+            document.getElementById("id-card-holder").innerText = cardUsername;
+            document.getElementById("id-session-ip").innerText = controllerIP;
+            document.getElementById("id-login-time").innerText =
+              formatDateTime(now);
+            document.getElementById("id-expiry-time").innerText =
+              formatDateTime(expiry);
+
+            // Show session panel, hide form + swipe button
+            document
+              .getElementById("id-session-panel")
+              .classList.remove("hidden");
+            document
+              .getElementById("id-auth-form")
+              .classList.add("hidden"); /* ADDED */
+            swipeBtn.classList.add("hidden");
+
+            statusText.innerHTML =
+              '<span class="success-msg">ACCESS GRANTED</span>';
+            state.authStatus = "VERIFIED";
+
+            // Start countdown
+            startIdCountdown();
+
+            // Log this session
+            addSessionLog("idCard", {
+              cardHolder: cardUsername,
+              ip: controllerIP,
+              loginTime: now,
+              expiryTime: expiry,
+              status: "ACTIVE",
+            });
+
+            alert(
+              `ID Card Accepted.\nCard Holder: ${cardUsername}\nController IP: ${controllerIP}\nLogin Time: ${formatDateTime(now)}\nSession Duration: 8 Hours\nAuto-terminates at: ${formatDateTime(expiry)}`,
+            );
+          } else {
+            /* FIXED: show real error instead of just "LOGIN REQUIRED" */
+            let msg = "Authentication Failed";
+            try {
+              const e = await response.json();
+              msg = e.error || msg;
+            } catch (_) {}
+            statusText.innerHTML = `<span class="error-msg">ACCESS DENIED: ${msg}</span>`;
+            state.authStatus = "DENIED";
+            swipeBtn.disabled = false;
+          }
+        } catch (err) {
+          statusText.innerHTML =
+            '<span class="error-msg">SERVER ERROR — Backend unreachable</span>';
+          state.authStatus = "ERROR";
+          swipeBtn.disabled = false;
+        }
+
+        spinner.style.display = "none";
+
+        setTimeout(() => {
+          reader.classList.remove("swipe-active");
+        }, 2100);
+
+        updateSidebar();
+      }
+
+      /* --- ID Card Countdown --- */
+      function startIdCountdown() {
+        if (sessions.idCard.countdownInterval) {
+          clearInterval(sessions.idCard.countdownInterval);
+        }
+
+        const countdownEl = document.getElementById("id-countdown");
+
+        sessions.idCard.countdownInterval = setInterval(() => {
+          if (!sessions.idCard.active) {
+            clearInterval(sessions.idCard.countdownInterval);
+            return;
+          }
+
+          const remaining = sessions.idCard.expiryTime - new Date();
+
+          if (remaining <= 0) {
+            // Auto-terminate
+            clearInterval(sessions.idCard.countdownInterval);
+            countdownEl.innerText = "00:00:00";
+            autoTerminateIdSession();
+            return;
+          }
+
+          countdownEl.innerText = formatCountdown(remaining);
+
+          // Color warnings
+          countdownEl.className = "session-countdown";
+          if (remaining < 30 * 60 * 1000)
+            countdownEl.className += " critical"; // < 30 min
+          else if (remaining < 60 * 60 * 1000)
+            countdownEl.className += " warning"; // < 1 hour
+
+          // Sidebar update
+          updateSidebar();
+        }, 1000);
+      }
+
+      /* --- Auto-terminate ID session on expiry --- */
+      function autoTerminateIdSession() {
+        alert(
+          "⚠ ID Card Session EXPIRED after 8 hours. Access terminated automatically.",
+        );
+        closeIdSession("EXPIRED");
+      }
+
+      /* --- Manual terminate ID session --- */
+      function terminateIdSession() {
+        if (!sessions.idCard.active) return;
+        closeIdSession("CLOSED");
+        state.authStatus = "CLOSED";
+        alert("ID Card Session Terminated. Duration logged.");
+        updateSidebar();
+      }
+
+      /* --- Shared close logic --- */
+      function closeIdSession(reason) {
+        const logIndex = sessions.idCard.log.findIndex(
+          (l) => l.status === "ACTIVE",
+        );
+        if (logIndex !== -1) {
+          sessions.idCard.log[logIndex].status = reason;
+          sessions.idCard.log[logIndex].logoutTime = new Date();
+        }
+
+        sessions.idCard.active = false;
+        clearInterval(sessions.idCard.countdownInterval);
+
+        // Reset UI
+        document.getElementById("id-session-panel").classList.add("hidden");
+        document
+          .getElementById("id-auth-form")
+          .classList.remove("hidden"); /* ADDED */
+        document.getElementById("id-swipe-btn").classList.remove("hidden");
+        document.getElementById("id-swipe-btn").disabled = false;
+        document.getElementById("id-countdown").innerText = "08:00:00";
+        document.getElementById("id-countdown").className = "session-countdown";
+        document.getElementById("id-status-text").innerText =
+          "Session ended. Ready for next swipe.";
+
+        sessions.idCard.staffId = null;
+        sessions.idCard.cardIp = null;
+        sessions.idCard.loginTime = null;
+        sessions.idCard.expiryTime = null;
+
+        saveToStorage(); /* ADDED */
+        renderIdSessionLog();
+        updateSidebar();
+      }
+
+      /* ==============================
+   FINGERPRINT SCAN
+   FIXED: uses staff_id input — no web login required.
+   Backend receives staff_id directly; no username/password needed.
+   - No IP assigned (direct line)
+   - Stores staff_id, login time
+   - Starts 8-hour countdown
+   - Auto-terminates on expiry
+============================== */
+
+      async function startFingerprintScan() {
+        // Prevent double scan if session already active
+        if (sessions.fingerprint.active) {
+          alert(
+            "A biometric session is already active. Terminate the current session first.",
+          );
+          return;
+        }
+
+        const scanner = document.getElementById("fp-scanner");
+        const statusText = document.getElementById("fp-status-text");
+
+        /* FIXED: read from the input field instead of a hardcoded constant */
+        const staffId =
+          document.getElementById("fp-staff-input").value.trim() ||
+          "bio_staff_001";
+
+        scanner.classList.add("scanning");
+        statusText.innerText = "Scanning...";
+
+        state.currentIP = "N/A (Fingerprint)";
+        updateSidebar();
+
+        try {
+          const now = new Date();
+
+          const response = await fetch(BASE_URL + "/login", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              staff_id: staffId,
+            }),
+          });
+
+          if (response.ok) {
+            const expiry = new Date(now.getTime() + SESSION_DURATION_MS);
+
+            // Store session info
+            sessions.fingerprint.active = true;
+            sessions.fingerprint.staffId = staffId;
+            sessions.fingerprint.loginTime = now;
+            sessions.fingerprint.expiryTime = expiry;
+            saveToStorage(); /* ADDED */
+
+            // Update UI fields
+            document.getElementById("fp-staff-id").innerText = staffId;
+            document.getElementById("fp-login-time").innerText =
+              formatDateTime(now);
+            document.getElementById("fp-expiry-time").innerText =
+              formatDateTime(expiry);
+
+            // Show session panel, hide input form
+            document
+              .getElementById("fp-session-panel")
+              .classList.remove("hidden");
+            document
+              .getElementById("fp-auth-form")
+              .classList.add("hidden"); /* ADDED */
+
+            statusText.innerHTML =
+              '<span class="success-msg">IDENTITY VERIFIED</span>';
+            state.authStatus = "VERIFIED";
+
+            // Start countdown
+            startFpCountdown();
+
+            // Log session
+            addSessionLog("fingerprint", {
+              staffId: staffId,
+              ip: "N/A",
+              loginTime: now,
+              expiryTime: expiry,
+              status: "ACTIVE",
+            });
+
+            // Notify backend
+            logSessionToBackend({
+              type: "fingerprint",
+              staff_id: staffId,
+              ip: null,
+              login_time: now.toISOString(),
+              expiry_time: expiry.toISOString(),
+            });
+
+            alert(
+              `Biometric Auth Success.\nStaff ID: ${staffId}\nIP: N/A (Direct Line)\nLogin Time: ${formatDateTime(now)}\nSession Duration: 8 Hours\nAuto-terminates at: ${formatDateTime(expiry)}`,
+            );
+          } else {
+            /* FIXED: show real error instead of just "LOGIN REQUIRED" */
+            let msg = "Biometric Auth Failed";
+            try {
+              const e = await response.json();
+              msg = e.error || msg;
+            } catch (_) {}
+            statusText.innerHTML = `<span class="error-msg">DENIED: ${msg}</span>`;
+            state.authStatus = "DENIED";
+          }
+        } catch (err) {
+          statusText.innerHTML =
+            '<span class="error-msg">SERVER ERROR — Backend unreachable</span>';
+          state.authStatus = "ERROR";
+        }
+
+        setTimeout(() => {
+          scanner.classList.remove("scanning");
+        }, 2000);
+
+        updateSidebar();
+      }
+
+      /* --- Fingerprint Countdown --- */
+      function startFpCountdown() {
+        if (sessions.fingerprint.countdownInterval) {
+          clearInterval(sessions.fingerprint.countdownInterval);
+        }
+
+        const countdownEl = document.getElementById("fp-countdown");
+
+        sessions.fingerprint.countdownInterval = setInterval(() => {
+          if (!sessions.fingerprint.active) {
+            clearInterval(sessions.fingerprint.countdownInterval);
+            return;
+          }
+
+          const remaining = sessions.fingerprint.expiryTime - new Date();
+
+          if (remaining <= 0) {
+            clearInterval(sessions.fingerprint.countdownInterval);
+            countdownEl.innerText = "00:00:00";
+            autoTerminateFpSession();
+            return;
+          }
+
+          countdownEl.innerText = formatCountdown(remaining);
+
+          countdownEl.className = "session-countdown";
+          if (remaining < 30 * 60 * 1000) countdownEl.className += " critical";
+          else if (remaining < 60 * 60 * 1000)
+            countdownEl.className += " warning";
+
+          updateSidebar();
+        }, 1000);
+      }
+
+      /* --- Auto-terminate fingerprint session --- */
+      function autoTerminateFpSession() {
+        alert(
+          "⚠ Biometric Session EXPIRED after 8 hours. Access terminated automatically.",
+        );
+        closeFpSession("EXPIRED");
+      }
+
+      /* --- Manual terminate fingerprint session --- */
+      function terminateFpSession() {
+        if (!sessions.fingerprint.active) return;
+        closeFpSession("CLOSED");
+        state.authStatus = "CLOSED";
+        alert("Biometric Session Terminated. Duration logged.");
+        updateSidebar();
+      }
+
+      /* --- Shared close logic --- */
+      function closeFpSession(reason) {
+        const logIndex = sessions.fingerprint.log.findIndex(
+          (l) => l.status === "ACTIVE",
+        );
+        if (logIndex !== -1) {
+          sessions.fingerprint.log[logIndex].status = reason;
+          sessions.fingerprint.log[logIndex].logoutTime = new Date();
+        }
+
+        sessions.fingerprint.active = false;
+        clearInterval(sessions.fingerprint.countdownInterval);
+
+        // Notify backend
+        logSessionToBackend({
+          type: "fingerprint_logout",
+          staff_id: sessions.fingerprint.staffId,
+          ip: null,
+          logout_time: new Date().toISOString(),
+          reason: reason,
         });
 
-        if (!response.ok) {
+        // Reset UI
+        document.getElementById("fp-session-panel").classList.add("hidden");
+        document
+          .getElementById("fp-auth-form")
+          .classList.remove("hidden"); /* ADDED */
+        document.getElementById("fp-countdown").innerText = "08:00:00";
+        document.getElementById("fp-countdown").className = "session-countdown";
+        document.getElementById("fp-status-text").innerText =
+          "Session ended. Place finger to scan again.";
+
+        sessions.fingerprint.staffId = null;
+        sessions.fingerprint.loginTime = null;
+        sessions.fingerprint.expiryTime = null;
+
+        saveToStorage(); /* ADDED */
+        renderFpSessionLog();
+        updateSidebar();
+      }
+
+      /* ==============================
+   SESSION LOG HELPERS
+============================== */
+
+      function addSessionLog(type, record) {
+        if (type === "idCard") {
+          sessions.idCard.log.unshift(record);
+          renderIdSessionLog();
+        } else {
+          sessions.fingerprint.log.unshift(record);
+          renderFpSessionLog();
+        }
+      }
+
+      function renderIdSessionLog() {
+        const container = document.getElementById("id-log-entries");
+        if (sessions.idCard.log.length === 0) {
+          container.innerHTML =
+            '<div style="color: var(--text-dim); font-size: 0.75rem;">No sessions recorded yet.</div>';
+          return;
+        }
+        container.innerHTML = sessions.idCard.log
+          .map((l, i) => {
+            const statusColor =
+              l.status === "ACTIVE"
+                ? "var(--accent-green)"
+                : l.status === "EXPIRED" || l.status === "RESCUE_TERMINATED"
+                  ? "var(--accent-red)"
+                  : "var(--text-dim)";
+            const logoutInfo = l.logoutTime
+              ? ` | OUT: ${formatDateTime(l.logoutTime)}`
+              : "";
+            return `<div class="session-log-entry ${l.status !== "ACTIVE" ? "closed" : ""}">
+            [${i + 1}] <span style="color:${statusColor}">${l.status}</span> | 
+            User: ${l.cardHolder} | IP: ${l.ip}<br>
+            IN: ${formatDateTime(l.loginTime)}${logoutInfo}
+        </div>`;
+          })
+          .join("");
+      }
+
+      function renderFpSessionLog() {
+        const container = document.getElementById("fp-log-entries");
+        if (sessions.fingerprint.log.length === 0) {
+          container.innerHTML =
+            '<div style="color: var(--text-dim); font-size: 0.75rem;">No sessions recorded yet.</div>';
+          return;
+        }
+        container.innerHTML = sessions.fingerprint.log
+          .map((l, i) => {
+            const statusColor =
+              l.status === "ACTIVE"
+                ? "var(--accent-green)"
+                : l.status === "EXPIRED" || l.status === "RESCUE_TERMINATED"
+                  ? "var(--accent-red)"
+                  : "var(--text-dim)";
+            const logoutInfo = l.logoutTime
+              ? ` | OUT: ${formatDateTime(l.logoutTime)}`
+              : "";
+            return `<div class="session-log-entry ${l.status !== "ACTIVE" ? "closed" : ""}">
+            [${i + 1}] <span style="color:${statusColor}">${l.status}</span> | 
+            Staff ID: ${l.staffId} | IP: ${l.ip}<br>
+            IN: ${formatDateTime(l.loginTime)}${logoutInfo}
+        </div>`;
+          })
+          .join("");
+      }
+
+      /* ==============================
+   BACKEND SESSION LOGGER
+   Sends session data to backend for SQL storage.
+   Fails silently if backend is unreachable.
+============================== */
+
+      /* ==============================
+   PRINTER STATUS
+============================== */
+
+      async function pingPrinter() {
+        const ip = document.getElementById("printer-ip-select").value;
+        state.currentIP = ip;
+        updateSidebar();
+
+        try {
+          const response = await fetch(BASE_URL + "/api/monitor", {
+            credentials: "include",
+          });
+
+          if (!response.ok) {
             alert("Unauthorized. Please login first.");
             state.authStatus = "UNAUTHORIZED";
             updateSidebar();
             return;
-        }
+          }
 
-        const data = await response.json();
-        const printer = data.infrastructure?.HR_Printer;
+          const data = await response.json();
+          const printer = data.infrastructure?.HR_Printer;
 
-        if (printer && printer.status) {
+          if (printer && printer.status) {
             document.getElementById("printer-status-val").innerText = "ONLINE";
-            document.getElementById("printer-status-val").style.color = "var(--accent-green)";
+            document.getElementById("printer-status-val").style.color =
+              "var(--accent-green)";
             state.authStatus = "CONNECTED";
-        } else {
+          } else {
             document.getElementById("printer-status-val").innerText = "OFFLINE";
-            document.getElementById("printer-status-val").style.color = "var(--accent-red)";
+            document.getElementById("printer-status-val").style.color =
+              "var(--accent-red)";
             state.authStatus = "FAILED";
+          }
+        } catch (e) {
+          alert("Backend unreachable");
+          state.authStatus = "ERROR";
         }
 
-    } catch (e) {
-        alert("Backend unreachable");
-        state.authStatus = "ERROR";
-    }
+        updateSidebar();
+      }
 
-    updateSidebar();
-}
-/* ==============================
-   ID CARD SWIPE (MISSING FUNCTION FIXED)
-============================== */
-
-async function simulateIdSwipe() {
-
-    const reader = document.getElementById('id-reader');
-    const statusText = document.getElementById('id-status-text');
-    const spinner = document.getElementById('id-spinner');
-
-    reader.classList.add('swipe-active');
-    spinner.style.display = "block";
-    statusText.innerText = "Authenticating...";
-
-    state.currentIP = document.getElementById('id-ip-select').value;
-    updateSidebar();
-
-    try {
-        const response = await fetch(BASE_URL + "/api/monitor", {
-            credentials: "include"
-        });
-
-        if (response.ok) {
-            statusText.innerHTML = '<span class="success-msg">ACCESS GRANTED</span>';
-            state.authStatus = "VERIFIED";
-        } else {
-            statusText.innerHTML = '<span class="error-msg">LOGIN REQUIRED</span>';
-            state.authStatus = "DENIED";
-        }
-
-    } catch (err) {
-        statusText.innerHTML = '<span class="error-msg">SERVER ERROR</span>';
-        state.authStatus = "ERROR";
-    }
-
-    spinner.style.display = "none";
-    updateSidebar();
-}
-
-
-/* ==============================
-   FINGERPRINT SCAN (MISSING FUNCTION FIXED)
-============================== */
-
-async function startFingerprintScan() {
-
-    const scanner = document.getElementById('fp-scanner');
-    const statusText = document.getElementById('fp-status-text');
-
-    scanner.classList.add('scanning');
-    statusText.innerText = "Scanning...";
-
-    state.currentIP = "192.168.1.60";
-    updateSidebar();
-
-    try {
-        const response = await fetch(BASE_URL + "/api/monitor", {
-            credentials: "include"
-        });
-
-        if (response.ok) {
-            statusText.innerHTML = '<span class="success-msg">IDENTITY VERIFIED</span>';
-            state.authStatus = "VERIFIED";
-        } else {
-            statusText.innerHTML = '<span class="error-msg">LOGIN REQUIRED</span>';
-            state.authStatus = "DENIED";
-        }
-
-    } catch (err) {
-        statusText.innerHTML = '<span class="error-msg">SERVER ERROR</span>';
-        state.authStatus = "ERROR";
-    }
-
-    setTimeout(() => {
-        scanner.classList.remove('scanning');
-    }, 2000);
-
-    updateSidebar();
-}
-
-/* ==============================
+      /* ==============================
    BACKEND THREAT CHECK
 ============================== */
 
-async function checkBackendStatus() {
+      async function checkBackendStatus() {
+        try {
+          const res = await fetch(BASE_URL + "/api/monitor", {
+            credentials: "include",
+          });
 
-    try {
-        const res = await fetch(BASE_URL + "/api/monitor", {
-            credentials: "include"
-        });
+          if (!res.ok) {
+            if (res.status === 500) {
+              const data = await res.json();
+              if (data.ledger_integrity?.status === "CORRUPTED") {
+                state.threatLevel = "CRITICAL";
+              }
+            }
+            return;
+          }
 
-        if (!res.ok) return;
+          const data = await res.json();
 
-        const data = await res.json();
-
-        if (data.ledger_integrity?.status === "CORRUPTED") {
+          if (data.ledger_integrity?.status === "CORRUPTED") {
             state.threatLevel = "CRITICAL";
-        } else {
+          } else {
             state.threatLevel = "LOW";
+          }
+        } catch (e) {
+          state.threatLevel = "MEDIUM";
         }
 
-    } catch (e) {
-        state.threatLevel = "MEDIUM";
-    }
+        updateSidebar();
+      }
 
-    updateSidebar();
-}
-
-/* ==============================
-   NETWORK TEST (OPTIONAL DEMO)
+      /* ==============================
+   NETWORK TEST
 ============================== */
 
-function testConnection() {
-    const ip = document.getElementById('manual-ip').value || '0.0.0.0';
-    const result = document.getElementById('net-result');
+      function testConnection() {
+        const ip = document.getElementById("manual-ip").value || "0.0.0.0";
+        const result = document.getElementById("net-result");
 
-    state.currentIP = ip;
-    updateSidebar();
+        state.currentIP = ip;
+        updateSidebar();
 
-    result.innerText = "Testing backend route...";
-    result.style.color = "white";
+        result.innerText = "Testing backend route...";
+        result.style.color = "white";
 
-    fetch(BASE_URL + "/api/monitor", { credentials: "include" })
-        .then(res => {
-            if(res.ok) {
-                result.innerHTML = '<span class="success-msg">Backend Reachable</span>';
-                state.authStatus = "SUCCESS";
+        fetch(BASE_URL + "/api/monitor", { credentials: "include" })
+          .then((res) => {
+            if (res.ok) {
+              result.innerHTML =
+                '<span class="success-msg">Backend Reachable</span>';
+              state.authStatus = "SUCCESS";
             } else {
-                result.innerHTML = '<span class="error-msg">Unauthorized</span>';
-                state.authStatus = "ERROR";
+              result.innerHTML = '<span class="error-msg">Unauthorized</span>';
+              state.authStatus = "ERROR";
             }
             updateSidebar();
-        })
-        .catch(() => {
-            result.innerHTML = '<span class="error-msg">Connection Failed</span>';
+          })
+          .catch(() => {
+            result.innerHTML =
+              '<span class="error-msg">Connection Failed</span>';
             state.authStatus = "ERROR";
             updateSidebar();
-        });
-}
+          });
+      }
 
-/* ============================== */
+      /* ==============================
+   ADDED: RESCUE MODE
+============================== */
 
-window.onload = init;
-</script>
+      function openRescue() {
+        document.getElementById("rescue-overlay").classList.add("active");
+      }
 
-</body>
+      function closeRescue() {
+        document.getElementById("rescue-overlay").classList.remove("active");
+      }
+
+      function rescueAction(action) {
+        switch (action) {
+          case "clear_web":
+            sessions.web.active = false;
+            sessions.web.username = null;
+            document.getElementById("login-form").classList.remove("hidden");
+            document.getElementById("logout-panel").classList.add("hidden");
+            saveToStorage();
+            alert("✅ Web session cleared. User logged out.");
+            break;
+
+          case "clear_idcard":
+            if (sessions.idCard.active) {
+              closeIdSession("RESCUE_TERMINATED");
+              alert("✅ ID Card session force-terminated.");
+            } else {
+              // Reset any stuck UI state even if no active session
+              document
+                .getElementById("id-session-panel")
+                .classList.add("hidden");
+              document
+                .getElementById("id-auth-form")
+                .classList.remove("hidden");
+              document
+                .getElementById("id-swipe-btn")
+                .classList.remove("hidden");
+              document.getElementById("id-swipe-btn").disabled = false;
+              document.getElementById("id-status-text").innerText =
+                "Waiting for card swipe...";
+              alert("ℹ️ No active card session. UI state reset.");
+            }
+            break;
+
+          case "clear_fingerprint":
+            if (sessions.fingerprint.active) {
+              closeFpSession("RESCUE_TERMINATED");
+              alert("✅ Biometric session force-terminated.");
+            } else {
+              document
+                .getElementById("fp-session-panel")
+                .classList.add("hidden");
+              document
+                .getElementById("fp-auth-form")
+                .classList.remove("hidden");
+              document.getElementById("fp-status-text").innerText =
+                "Place finger on scanner";
+              alert("ℹ️ No active biometric session. UI state reset.");
+            }
+            break;
+
+          case "clear_all":
+            if (
+              !confirm(
+                "⚠️ This will clear ALL sessions and reset the entire system. Continue?",
+              )
+            )
+              return;
+            if (sessions.idCard.active) closeIdSession("RESCUE_TERMINATED");
+            if (sessions.fingerprint.active)
+              closeFpSession("RESCUE_TERMINATED");
+            sessions.web.active = false;
+            sessions.web.username = null;
+            sessionStorage.removeItem("securecore_sessions");
+            // Reset all panels
+            document.getElementById("login-form").classList.remove("hidden");
+            document.getElementById("logout-panel").classList.add("hidden");
+            document.getElementById("id-session-panel").classList.add("hidden");
+            document.getElementById("id-auth-form").classList.remove("hidden");
+            document.getElementById("id-swipe-btn").classList.remove("hidden");
+            document.getElementById("id-swipe-btn").disabled = false;
+            document.getElementById("fp-session-panel").classList.add("hidden");
+            document.getElementById("fp-auth-form").classList.remove("hidden");
+            document.getElementById("id-status-text").innerText =
+              "Waiting for card swipe...";
+            document.getElementById("fp-status-text").innerText =
+              "Place finger on scanner";
+            document.getElementById("id-log-entries").innerHTML =
+              '<div style="color: var(--text-dim); font-size: 0.75rem;">No sessions recorded yet.</div>';
+            document.getElementById("fp-log-entries").innerHTML =
+              '<div style="color: var(--text-dim); font-size: 0.75rem;">No sessions recorded yet.</div>';
+            state.authStatus = "PENDING";
+            state.threatLevel = "LOW";
+            updateSidebar();
+            alert("✅ Full system reset complete. All sessions cleared.");
+            break;
+
+          case "restore_threat":
+            state.threatLevel = "LOW";
+            updateSidebar();
+            alert("✅ Threat level reset to LOW.");
+            break;
+        }
+        closeRescue();
+      }
+
+      /* ==============================
+   ATTACK SIMULATIONS
+============================== */
+
+      async function runAttack(type) {
+        if (type === "bruteforce") {
+          alert("Starting Brute Force Simulation (6 Attempts)...");
+          const user = "admin";
+          for (let i = 0; i < 6; i++) {
+            console.log(`Attempt ${i + 1}`);
+            const res = await fetch(BASE_URL + "/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                username: user,
+                password: `wrong_${Math.random()}`,
+              }),
+            });
+            if (res.status === 403) {
+              alert("Brute Force Defense Triggered! IP Blocked 🚫");
+              break;
+            }
+          }
+        } else if (type === "unauthorized") {
+          alert("Attempting unauthorized access to /api/monitor...");
+          const res = await fetch(BASE_URL + "/api/monitor");
+          if (res.status === 401 || res.status === 403)
+            alert("Defense Success: Access Denied 🛡");
+          else alert("Fail: Access Granted (This shouldn't happen)");
+        } else if (type === "tampering") {
+          alert("Injecting malicious data into Ledger...");
+          try {
+            const res = await fetch(BASE_URL + "/simulate/corrupt", {
+              method: "POST",
+            });
+            if (res.ok) {
+              alert("Ledger Corrupted! Watch the Threat Level...");
+              checkBackendStatus();
+            }
+          } catch (e) {
+            alert("Attack failed to reach server");
+          }
+        } else if (type === "session_theft") {
+          alert("Simulating Stolen Session Token...");
+          const res = await fetch(BASE_URL + "/api/monitor", {
+            headers: { Cookie: "session=invalid_stolen_hash" },
+          });
+          if (res.status === 401 || res.status === 403)
+            alert("System blocked invalid session token ✅");
+        } else if (type === "flood") {
+          alert("Sending 20 rapid requests to /login...");
+          for (let i = 0; i < 20; i++) {
+            fetch(BASE_URL + "/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ username: "admin", password: "bad" }),
+            });
+          }
+          alert("Flood sent. Check logs for IP blocking.");
+        }
+      }
+      async function logSessionToBackend(payload) {
+        try {
+          await fetch(BASE_URL + "/api/session_log", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+        } catch (e) {
+          console.warn("Session log failed (backend unreachable):", e);
+        }
+      }
+
+      /* ============================== */
+
+      window.onload = init;
+    </script>
+  </body>
 </html>

@@ -1,0 +1,5 @@
+Email: admin@zerotrust.com
+Password: Admin@123
+
+Email: special@zerotrust.com
+Password: Special@123

@@ -332,6 +332,7 @@ def login():
         
         if is_fingerprint or is_card:
             # Assumes hardware scanner/reader validated the physical token
+            # In a real app, you would validate a hardware secret here
             auth_success = True 
         elif password and bcrypt.checkpw(password.encode(), stored_hash):
             auth_success = True
@@ -443,7 +444,7 @@ def api_monitor():
     })
 
 # ===============================
-# NEW REPORTING APIS (Added for HTML)
+# ADMIN REPORTING APIS
 # ===============================
 
 @app.route("/api/admin/success_logins", methods=["GET"])
@@ -497,9 +498,67 @@ def get_failed_logins():
         if conn and conn.is_connected():
             conn.close()
 
+# ===============================
+# IP BLOCKING APIS (NEW)
+# ===============================
+
+@app.route("/api/admin/blocked_ips", methods=["GET"])
+@login_required
+def get_blocked_ips():
+    """Returns the list of currently blocked IPs stored in memory"""
+    blocked_list = []
+    now = datetime.now(UTC)
+    
+    for ip, info in FAILED_IP_ATTEMPTS.items():
+        if info.get("lock_until") and now < info["lock_until"]:
+            blocked_list.append({
+                "ip": ip,
+                "lock_until": info["lock_until"].isoformat()
+            })
+            
+    return jsonify(blocked_list)
+
+@app.route("/api/admin/block_ip", methods=["POST"])
+@login_required
+def manual_block_ip():
+    """Manually blocks an IP for 10 years"""
+    data = request.get_json()
+    ip = data.get("ip")
+    
+    if not ip:
+        return jsonify({"error": "IP required"}), 400
+        
+    # Block for 10 years
+    lock_time = datetime.now(UTC) + timedelta(days=3650)
+    
+    FAILED_IP_ATTEMPTS[ip] = {
+        "count": 999,
+        "lock_until": lock_time
+    }
+    
+    ledger.add_block("MANUAL_BLOCK", {"ip": ip, "admin": session.get("admin_user")})
+    
+    return jsonify({"message": f"IP {ip} blocked successfully"})
+
+@app.route("/api/admin/unblock_ip", methods=["POST"])
+@login_required
+def unblock_ip():
+    """Removes an IP from the block list"""
+    data = request.get_json()
+    ip = data.get("ip")
+    
+    if not ip:
+        return jsonify({"error": "IP required"}), 400
+        
+    if ip in FAILED_IP_ATTEMPTS:
+        FAILED_IP_ATTEMPTS.pop(ip)
+        ledger.add_block("MANUAL_UNBLOCK", {"ip": ip, "admin": session.get("admin_user")})
+        return jsonify({"message": f"IP {ip} unblocked"})
+    
+    return jsonify({"message": "IP was not blocked"})
+
 @app.route("/api/session_log", methods=["POST"])
 def session_log():
-    """Endpoint for frontend to report specific session events"""
     return jsonify({"status": "logged"})
 
 # ===============================

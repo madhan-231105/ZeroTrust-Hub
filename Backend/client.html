@@ -656,6 +656,34 @@
         color: #444;
         font-family: monospace;
       }
+      /* ===== NEW STYLES FOR BLOCK/UNBLOCK BUTTONS ===== */
+      .block-btn {
+        background: var(--accent-red);
+        color: white;
+        border: none;
+        padding: 4px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.75rem;
+        font-weight: bold;
+      }
+      .block-btn:hover {
+        background: #b62324;
+      }
+      .unblock-btn {
+        background: var(--accent-green);
+        color: black;
+        border: none;
+        padding: 4px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.75rem;
+        font-weight: bold;
+      }
+      .unblock-btn:hover {
+        background: #2ea043;
+        color: white;
+      }
     </style>
   </head>
   <body>
@@ -710,7 +738,7 @@
 
     <div class="dashboard-container">
       <header>
-        <div class="logo">ZeroTrust-Hub// ACCESS CONTROL</div>
+        <div class="logo">ZeroTrust-Hub // ACCESS CONTROL</div>
         <div style="display: flex; align-items: center; gap: 20px">
           <button
             onclick="openRescue()"
@@ -810,6 +838,17 @@
               </svg>
               <h3>Admin Failed Attempts</h3>
               <p style="color: var(--accent-red); font-size: 0.8rem">FAILED only</p>
+            </div>
+
+            <!-- ────────────────────────────────
+                 ADDED: IP Firewall Card (NEW)
+            ──────────────────────────────── -->
+            <div class="device-card" onclick="openInterface('blocked-ips')">
+              <svg viewBox="0 0 24 24" fill="var(--accent-orange)">
+                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/>
+              </svg>
+              <h3>IP Firewall</h3>
+              <p style="color: var(--accent-orange); font-size: 0.8rem">Manage Blocked IPs</p>
             </div>
 
           </div>
@@ -1059,9 +1098,46 @@
                   <th>Login Time</th>
                   <th>IP / Source</th>
                   <th>Fingerprint (prefix)</th>
+                  <!-- ADDED: Column for action -->
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody id="failed-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ────────────────────────────────────────────────
+             ADDED SECTION: IP FIREWALL PAGE (NEW)
+        ──────────────────────────────────────────────── -->
+        <section id="view-blocked-ips" class="view-section">
+          <div class="interface-panel">
+            <button class="back-btn" onclick="goBack()">← BACK</button>
+            <h2 style="color: var(--accent-orange);">IP Firewall Management</h2>
+            
+            <div style="margin: 20px 0; padding: 15px; border: 1px solid #30363d; border-radius: 6px;">
+               <h3 style="font-size: 0.9rem; margin-bottom: 10px;">Manual IP Block</h3>
+               <div style="display: flex; gap: 10px;">
+                  <input type="text" id="manual-block-ip" placeholder="Enter IP address (e.g. 192.168.1.100)">
+                  <button class="primary-btn" style="width: 150px; background: var(--accent-red);" onclick="manualBlockIP()">Block IP</button>
+               </div>
+            </div>
+
+            <div class="report-controls">
+              <button class="refresh-btn" onclick="loadBlockedIPs()">Refresh List</button>
+            </div>
+
+            <div id="blocked-loading" class="loading-text">Loading blocked IPs...</div>
+
+            <table id="blocked-table" class="report-table" style="display:none;">
+              <thead>
+                <tr>
+                  <th>IP Address</th>
+                  <th>Locked Until</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="blocked-tbody"></tbody>
             </table>
           </div>
         </section>
@@ -1342,6 +1418,8 @@
         // Auto load reports when opening those views
         if (id === 'success-logins') loadSuccessLogins();
         if (id === 'failed-logins')  loadFailedLogins();
+        // ADDED: Auto-load blocked IPs
+        if (id === 'blocked-ips')    loadBlockedIPs();
       }
 
       function goBack() {
@@ -2056,7 +2134,7 @@
           const rows = await res.json();
 
           if (rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-dim);">No failed attempts found for admin</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-dim);">No failed attempts found for admin</td></tr>';
           } else {
             rows.forEach(row => {
               const tr = document.createElement("tr");
@@ -2065,6 +2143,7 @@
                 <td>${row.login_time || '—'}</td>
                 <td>${row.ip_address}</td>
                 <td class="fingerprint-short">${row.fingerprint ? row.fingerprint.substring(0, 16) + '...' : '—'}</td>
+                <td><button class="block-btn" onclick="blockIP('${row.ip_address}')">Block</button></td>
               `;
               tbody.appendChild(tr);
             });
@@ -2076,6 +2155,83 @@
           loadingDiv.innerHTML = '<span class="error-msg">Connection error</span>';
           console.error(err);
         }
+      }
+
+      /* ==============================
+         ADDED: IP Blocking Functions (NEW)
+      ============================== */
+
+      async function loadBlockedIPs() {
+        const loadingDiv = document.getElementById("blocked-loading");
+        const table = document.getElementById("blocked-table");
+        const tbody = document.getElementById("blocked-tbody");
+        
+        loadingDiv.style.display = "block"; 
+        table.style.display = "none"; 
+        tbody.innerHTML = "";
+
+        try {
+            const res = await fetch(BASE_URL + "/api/admin/blocked_ips", { credentials: "include" });
+            if(!res.ok) { 
+                loadingDiv.innerText = "Unauthorized or Error"; 
+                return; 
+            }
+            
+            const rows = await res.json();
+            if(rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No IPs are currently blocked.</td></tr>';
+            } else {
+                rows.forEach(row => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td>${row.ip}</td>
+                        <td>${row.lock_until}</td>
+                        <td><button class="unblock-btn" onclick="unblockIP('${row.ip}')">Unblock</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            loadingDiv.style.display = "none"; 
+            table.style.display = "table";
+        } catch(e) { console.error(e); }
+      }
+
+      async function manualBlockIP() {
+          const ip = document.getElementById("manual-block-ip").value.trim();
+          if(!ip) return alert("Please enter an IP");
+          blockIP(ip);
+      }
+
+      async function blockIP(ip) {
+          if(!confirm(`Are you sure you want to BLOCK IP: ${ip}?`)) return;
+          try {
+              const res = await fetch(BASE_URL + "/api/admin/block_ip", {
+                  method: "POST", credentials: "include",
+                  headers: {"Content-Type": "application/json"},
+                  body: JSON.stringify({ip})
+              });
+              if(res.ok) { 
+                  alert("IP Blocked Successfully"); 
+                  // If we are on the blocked IPs view, reload it
+                  if(state.currentNode === "BLOCKED IPS") loadBlockedIPs();
+              }
+              else alert("Failed to block IP");
+          } catch(e) { alert("Error connecting to backend"); }
+      }
+
+      async function unblockIP(ip) {
+          if(!confirm(`Unblock IP: ${ip}?`)) return;
+          try {
+              const res = await fetch(BASE_URL + "/api/admin/unblock_ip", {
+                  method: "POST", credentials: "include",
+                  headers: {"Content-Type": "application/json"},
+                  body: JSON.stringify({ip})
+              });
+              if(res.ok) { 
+                  alert("IP Unblocked"); 
+                  loadBlockedIPs(); 
+              }
+          } catch(e) { alert("Error"); }
       }
 
       /* ============================== */

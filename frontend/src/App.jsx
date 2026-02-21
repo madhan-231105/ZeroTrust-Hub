@@ -1,18 +1,26 @@
-// src/App.jsx
-import React from 'react';
-// import navbar from './Components/navbar';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Layout from "./components/layout/Layout";
+import Selection from "./pages/Selection";
+import WebAuth from "./pages/WebAuth";
+import IdCard from "./pages/IdCard";
+import Fingerprint from "./pages/Fingerprint";
+import Printer from "./pages/Printer";
+import Network from "./pages/Network";
+
 function App() {
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-md text-center">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">
-          Welcome to Zero
-        </h1>
-        <p className="text-gray-600">
-          This is your default <code>App.jsx</code> using Tailwind CSS.
-        </p>
-      </div>
-    </div>
+    <BrowserRouter>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Selection />} />
+          <Route path="/web" element={<WebAuth />} />
+          <Route path="/idcard" element={<IdCard />} />
+          <Route path="/fingerprint" element={<Fingerprint />} />
+          <Route path="/printer" element={<Printer />} />
+          <Route path="/network" element={<Network />} />
+        </Routes>
+      </Layout>
+    </BrowserRouter>
   );
 }
 

@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SECURE-CORE | Enterprise Security Dashboard</title>
+    <style>
+        :root {
+            --bg-deep: #05070a;
+            --bg-panel: #0d1117;
+            --bg-card: #161b22;
+            --accent-cyan: #00f2ff;
+            --accent-green: #39ff14;
+            --accent-red: #ff3131;
+            --text-main: #e6edf3;
+            --text-dim: #8b949e;
+            --glow-cyan: 0 0 15px rgba(0, 242, 255, 0.3);
+            --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* --- Layout Structures --- */
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            height: 100vh;
+            gap: 1px;
+            background: #30363d;
+        }
+
+        header {
+            grid-column: 1 / span 2;
+            height: 60px;
+            background: var(--bg-panel);
+            display: flex;
+            align-items: center;
+            padding: 0 30px;
+            justify-content: space-between;
+            border-bottom: 1px solid #30363d;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .logo {
+            font-weight: 800;
+            letter-spacing: 2px;
+            font-size: 1.2rem;
+            color: var(--accent-cyan);
+            text-shadow: var(--glow-cyan);
+        }
+
+        .main-content {
+            background: var(--bg-deep);
+            padding: 40px;
+            position: relative;
+            overflow-y: auto;
+        }
+
+        /* --- Sidebar Status Panel --- */
+        .status-panel {
+            background: var(--bg-panel);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            border-left: 1px solid #30363d;
+        }
+
+        .status-header {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-dim);
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 10px;
+        }
+
+        .status-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .status-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .status-value {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            color: var(--accent-cyan);
+        }
+
+        .threat-indicator {
+            height: 40px;
+            border-radius: 4px;
+            background: #1c2128;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .threat-bar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 30%;
+            transition: var(--transition);
+        }
+
+        /* --- Selection Grid --- */
+        .view-section {
+            display: none;
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .view-section.active {
+            display: block;
+        }
+
+        .selection-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 25px;
+        }
+
+        .device-card {
+            background: var(--bg-card);
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .device-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .device-card svg {
+            width: 50px;
+            height: 50px;
+            fill: var(--accent-cyan);
+            margin-bottom: 15px;
+        }
+
+        .device-card h3 {
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+
+        /* --- Device Interface Panels --- */
+        .interface-panel {
+            background: var(--bg-panel);
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 700px;
+            margin: 0 auto;
+            border: 1px solid #30363d;
+        }
+
+        .back-btn {
+            background: none;
+            border: 1px solid var(--text-dim);
+            color: var(--text-dim);
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 30px;
+            transition: var(--transition);
+        }
+
+        .back-btn:hover {
+            color: var(--accent-cyan);
+            border-color: var(--accent-cyan);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.8rem;
+            margin-bottom: 8px;
+            color: var(--text-dim);
+        }
+
+        select, input {
+            width: 100%;
+            background: var(--bg-deep);
+            border: 1px solid #30363d;
+            padding: 12px;
+            color: white;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        .primary-btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--accent-cyan);
+            border: none;
+            color: var(--bg-deep);
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .primary-btn:hover {
+            filter: brightness(1.2);
+            box-shadow: var(--glow-cyan);
+        }
+
+        /* --- Animations: ID Card --- */
+        .reader-slot {
+            width: 300px;
+            height: 20px;
+            background: #000;
+            margin: 50px auto;
+            border-radius: 10px;
+            position: relative;
+            border: 2px solid #30363d;
+        }
+
+        .id-card {
+            width: 120px;
+            height: 80px;
+            background: linear-gradient(45deg, #1f6feb, #00f2ff);
+            border-radius: 8px;
+            position: absolute;
+            top: -100px;
+            left: -150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            font-weight: bold;
+            color: #000;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        .swipe-active .id-card {
+            animation: swipeAnim 2s forwards;
+        }
+
+        @keyframes swipeAnim {
+            0% { transform: translateX(0) translateY(0); }
+            30% { transform: translateX(200px) translateY(100px); }
+            50% { transform: translateX(250px) translateY(100px); }
+            100% { transform: translateX(600px) translateY(100px); }
+        }
+
+        /* --- Animations: Fingerprint --- */
+        .fingerprint-container {
+            width: 180px;
+            height: 180px;
+            margin: 0 auto 30px;
+            border: 4px solid #1c2128;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .scanner-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 2px solid var(--accent-cyan);
+            border-radius: 50%;
+            animation: pulseRing 2s infinite;
+        }
+
+        .fingerprint-svg {
+            width: 80px;
+            height: 80px;
+            fill: var(--accent-cyan);
+            transition: var(--transition);
+        }
+
+        .scanning .fingerprint-svg {
+            animation: scanGlow 1s infinite alternate;
+        }
+
+        @keyframes pulseRing {
+            0% { transform: scale(0.8); opacity: 0.8; }
+            100% { transform: scale(1.3); opacity: 0; }
+        }
+
+        @keyframes scanGlow {
+            from { fill: var(--accent-cyan); filter: drop-shadow(0 0 2px var(--accent-cyan)); }
+            to { fill: var(--accent-green); filter: drop-shadow(0 0 15px var(--accent-green)); }
+        }
+
+        /* --- Animations: Printer Ripple --- */
+        .ping-container {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 20px;
+        }
+
+        .ripple {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
+            opacity: 0;
+        }
+
+        .pinging .ripple {
+            animation: rippleEffect 1.5s infinite;
+        }
+
+        @keyframes rippleEffect {
+            0% { width: 0; height: 0; opacity: 0.8; }
+            100% { width: 150px; height: 150px; opacity: 0; }
+        }
+
+        /* --- Loading Spinner --- */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 242, 255, 0.1);
+            border-top: 4px solid var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .success-msg { color: var(--accent-green); text-align: center; margin-top: 20px; font-weight: bold; }
+        .error-msg { color: var(--accent-red); text-align: center; margin-top: 20px; font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <header>
+        <div class="logo">SECURE-CORE // ACCESS CONTROL</div>
+        <div id="live-clock" style="font-family: monospace; letter-spacing: 2px;">00:00:00</div>
+    </header>
+
+    <main class="main-content">
+        
+        <!-- Selection View -->
+        <section id="view-selection" class="view-section active">
+            <h1 style="margin-bottom: 30px;">Select Authentication Node</h1>
+            <div class="selection-grid">
+                <div class="device-card" onclick="openInterface('web')">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                    <h3>Web Login</h3>
+                    <p style="color: var(--text-dim); font-size: 0.8rem;">Standard Protocol</p>
+                </div>
+                <div class="device-card" onclick="openInterface('idcard')">
+                    <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.1.89 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.11-.9-2-2-2zm0 14H4V6h16v12zM6 10h2v2H6zm0 4h8v2H6zm10 0h2v2h-2zm-6-4h8v2h-8z"/></svg>
+                    <h3>ID Card Access</h3>
+                    <p style="color: var(--text-dim); font-size: 0.8rem;">RFID / NFC Swipe</p>
+                </div>
+                <div class="device-card" onclick="openInterface('fingerprint')">
+                    <svg viewBox="0 0 24 24"><path d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.44-5.58 1.41-.28.16-.64.07-.8-.21-.16-.28-.07-.64.21-.8C7.67 2.37 9.77 1.9 12.01 1.9c2.13 0 4.02.46 5.8 1.51.28.16.37.52.21.8-.08.13-.21.26-.21.26zm2.36 4.19c-.01 0-.02 0-.03-.01-.51-.12-1.01-.18-1.53-.18-.51 0-.99.06-1.47.17-.31.07-.62-.12-.69-.43-.07-.31.12-.62.43-.69.59-.13 1.16-.2 1.73-.2.58 0 1.15.06 1.71.19.31.07.51.38.44.69-.06.27-.3.46-.59.46zM12 7c-1.63 0-3.06.35-4.39 1.05-.28.15-.64.04-.79-.24-.15-.28-.04-.64.24-.79C8.55 6.26 10.16 5.9 12 5.9c1.86 0 3.42.34 4.93 1.02.29.13.41.48.28.77-.13.29-.48.41-.77.28C15.12 7.33 13.62 7 12 7zm7.44 3.91c.03-.01.05-.01.08-.01.3-.01.55.21.59.51.05.33-.18.64-.51.69-1.27.19-1.78.36-2.91.75-.3.1-.63-.06-.73-.36-.1-.3.06-.63.36-.73 1.25-.43 1.83-.62 3.12-.85zM12 11.5c-1.01 0-1.95.14-2.85.43-.3.1-.63-.07-.73-.36-.1-.3.07-.63.36-.73 1.05-.34 2.14-.52 3.22-.52 1.1 0 2.14.18 3.14.53.3.11.46.43.35.73-.11.3-.43.46-.73.35-.91-.32-1.84-.43-2.76-.43z"/></svg>
+                    <h3>Fingerprint Scanner</h3>
+                    <p style="color: var(--text-dim); font-size: 0.8rem;">Biometric ID</p>
+                </div>
+                <div class="device-card" onclick="openInterface('printer')">
+                    <svg viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+                    <h3>Printer Access</h3>
+                    <p style="color: var(--text-dim); font-size: 0.8rem;">Shared Services</p>
+                </div>
+                <div class="device-card" onclick="openInterface('network')">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9L16.5 12 11 16.5z"/></svg>
+                    <h3>Network Service</h3>
+                    <p style="color: var(--text-dim); font-size: 0.8rem;">Custom Protocol</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Web Login View -->
+        <section id="view-web" class="view-section">
+            <div class="interface-panel">
+                <button class="back-btn" onclick="goBack()">&larr; BACK</button>
+                <h2 style="margin-bottom: 20px;">Web Authentication</h2>
+                <div class="input-group">
+                    <label>Username</label>
+                    <input type="text" placeholder="admin_user">
+                </div>
+                <div class="input-group">
+                    <label>Security Password</label>
+                    <input type="password" placeholder="••••••••">
+                </div>
+                <div style="margin-bottom: 25px; padding: 15px; background: var(--bg-deep); border-radius: 6px;">
+                    <p style="font-size: 0.7rem; color: var(--text-dim);">IP: <span id="web-ip">127.0.0.1</span></p>
+                    <p style="font-size: 0.7rem; color: var(--text-dim);">FINGERPRINT: <span id="web-fp" style="color: var(--accent-cyan);"></span></p>
+                    <p style="font-size: 0.7rem; color: var(--text-dim);">WHITELIST: <span style="color: var(--accent-green);">TRUE</span></p>
+                </div>
+                <button class="primary-btn" onclick="simulateAuth('web')">Login</button>
+            </div>
+        </section>
+
+        <!-- ID Card View -->
+        <section id="view-idcard" class="view-section">
+            <div class="interface-panel">
+                <button class="back-btn" onclick="goBack()">&larr; BACK</button>
+                <h2>ID Card Reader</h2>
+                <div class="input-group">
+                    <label>Select Controller IP</label>
+                    <select id="id-ip-select">
+                        <option>192.168.1.70</option>
+                        <option>192.168.1.71</option>
+                        <option>192.168.1.72</option>
+                    </select>
+                </div>
+                
+                <div class="reader-slot" id="id-reader">
+                    <div class="id-card">SCAN CARD</div>
+                </div>
+
+                <div id="id-status-text" style="text-align: center; font-size: 0.9rem; color: var(--text-dim);">Waiting for card swipe...</div>
+                <div class="spinner" id="id-spinner"></div>
+                
+                <button class="primary-btn" style="margin-top: 30px;" onclick="simulateIdSwipe()">Swipe Card</button>
+            </div>
+        </section>
+
+        <!-- Fingerprint View -->
+        <section id="view-fingerprint" class="view-section">
+            <div class="interface-panel">
+                <button class="back-btn" onclick="goBack()">&larr; BACK</button>
+                <h2 style="text-align: center; margin-bottom: 30px;">Biometric Scan</h2>
+                
+                <div class="fingerprint-container" id="fp-scanner" onclick="startFingerprintScan()">
+                    <div class="scanner-ring"></div>
+                    <svg class="fingerprint-svg" viewBox="0 0 24 24"><path d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.44-5.58 1.41-.28.16-.64.07-.8-.21-.16-.28-.07-.64.21-.8C7.67 2.37 9.77 1.9 12.01 1.9c2.13 0 4.02.46 5.8 1.51.28.16.37.52.21.8-.08.13-.21.26-.21.26zm2.36 4.19c-.01 0-.02 0-.03-.01-.51-.12-1.01-.18-1.53-.18-.51 0-.99.06-1.47.17-.31.07-.62-.12-.69-.43-.07-.31.12-.62.43-.69.59-.13 1.16-.2 1.73-.2.58 0 1.15.06 1.71.19.31.07.51.38.44.69-.06.27-.3.46-.59.46zM12 7c-1.63 0-3.06.35-4.39 1.05-.28.15-.64.04-.79-.24-.15-.28-.04-.64.24-.79C8.55 6.26 10.16 5.9 12 5.9c1.86 0 3.42.34 4.93 1.02.29.13.41.48.28.77-.13.29-.48.41-.77.28C15.12 7.33 13.62 7 12 7zm7.44 3.91c.03-.01.05-.01.08-.01.3-.01.55.21.59.51.05.33-.18.64-.51.69-1.27.19-1.78.36-2.91.75-.3.1-.63-.06-.73-.36-.1-.3.06-.63.36-.73 1.25-.43 1.83-.62 3.12-.85zM12 11.5c-1.01 0-1.95.14-2.85.43-.3.1-.63-.07-.73-.36-.1-.3.07-.63.36-.73 1.05-.34 2.14-.52 3.22-.52 1.1 0 2.14.18 3.14.53.3.11.46.43.35.73-.11.3-.43.46-.73.35-.91-.32-1.84-.43-2.76-.43z"/></svg>
+                </div>
+
+                <div id="fp-status-text" style="text-align: center; font-size: 0.9rem; color: var(--text-dim);">Place finger on scanner</div>
+                <p style="text-align: center; font-size: 0.7rem; color: var(--text-dim); margin-top: 10px;">AUTH IP: 192.168.1.60</p>
+            </div>
+        </section>
+
+        <!-- Printer View -->
+        <section id="view-printer" class="view-section">
+            <div class="interface-panel">
+                <button class="back-btn" onclick="goBack()">&larr; BACK</button>
+                <div style="text-align: center;">
+                    <div class="ping-container" id="ping-box">
+                        <div class="ripple"></div>
+                        <div class="ripple" style="animation-delay: 0.5s;"></div>
+                        <svg style="width: 50px; fill: var(--accent-cyan); position: relative; z-index: 5;" viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+                    </div>
+                    <h2>Printer Network Status</h2>
+                </div>
+
+                <div class="input-group" style="margin-top: 30px;">
+                    <label>Printer Hub IP</label>
+                    <select id="printer-ip-select">
+                        <option>192.168.1.50</option>
+                        <option>192.168.1.51</option>
+                    </select>
+                </div>
+                
+                <div id="printer-status-box" style="padding: 15px; border-radius: 6px; text-align: center; margin-bottom: 20px; background: #1c2128;">
+                    STATUS: <span id="printer-status-val" style="color: var(--text-dim);">IDLE</span>
+                </div>
+
+                <button class="primary-btn" onclick="pingPrinter()">Check Connectivity</button>
+            </div>
+        </section>
+
+        <!-- Network View -->
+        <section id="view-network" class="view-section">
+            <div class="interface-panel">
+                <button class="back-btn" onclick="goBack()">&larr; BACK</button>
+                <h2>Custom Service Test</h2>
+                <div class="input-group">
+                    <label>Manual IP Address</label>
+                    <input type="text" id="manual-ip" placeholder="e.g. 10.0.0.1">
+                </div>
+                <div class="input-group">
+                    <label>Port</label>
+                    <input type="number" id="manual-port" placeholder="8080">
+                </div>
+                <div class="spinner" id="net-spinner" style="display: block; opacity: 0;"></div>
+                <div id="net-result" style="text-align: center; margin: 10px 0;"></div>
+                <button class="primary-btn" onclick="testConnection()">Test TCP Connection</button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Right Sidebar Status -->
+    <aside class="status-panel">
+        <div class="status-header">System Metrics</div>
+        
+        <div class="status-item">
+            <span class="status-label">Active Node</span>
+            <span class="status-value" id="stat-node">None</span>
+        </div>
+        
+        <div class="status-item">
+            <span class="status-label">Assigned IP</span>
+            <span class="status-value" id="stat-ip">---.---.---.---</span>
+        </div>
+
+        <div class="status-item">
+            <span class="status-label">Auth Status</span>
+            <span class="status-value" id="stat-auth">PENDING</span>
+        </div>
+
+        <div class="status-item">
+            <span class="status-label">Connection</span>
+            <span class="status-value" id="stat-conn">STABLE</span>
+        </div>
+
+        <div class="status-header">Threat Level</div>
+        <div class="threat-indicator">
+            <div class="threat-bar" id="threat-bar" style="background: var(--accent-green); width: 10%;"></div>
+            <span style="position: relative; z-index: 2; font-size: 0.7rem; font-weight: bold;" id="threat-text">LOW</span>
+        </div>
+
+        <div class="status-header">Timestamp</div>
+        <div class="status-value" id="live-clock-sidebar" style="font-size: 1.1rem;">00:00:00</div>
+    </aside>
+</div>
+
+<script>
+    // --- Global State & Initialization ---
+    const state = {
+        currentNode: 'Selection',
+        currentIP: 'N/A',
+        authStatus: 'PENDING',
+        threatLevel: 'LOW'
+    };
+
+    function init() {
+        updateClock();
+        setInterval(updateClock, 1000);
+        generateFingerprint();
+    }
+
+    function updateClock() {
+        const now = new Date();
+        const timeStr = now.toTimeString().split(' ')[0];
+        document.getElementById('live-clock').innerText = timeStr;
+        document.getElementById('live-clock-sidebar').innerText = timeStr;
+    }
+
+    function generateFingerprint() {
+        const hex = '0123456789ABCDEF';
+        let res = '';
+        for(let i=0; i<16; i++) res += hex[Math.floor(Math.random()*16)];
+        document.getElementById('web-fp').innerText = 'SEC-' + res;
+    }
+
+    // --- Navigation ---
+    function openInterface(id) {
+        document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+        document.getElementById('view-' + id).classList.add('active');
+        
+        // Update Sidebar
+        state.currentNode = id.toUpperCase();
+        updateSidebar();
+    }
+
+    function goBack() {
+        document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+        document.getElementById('view-selection').classList.add('active');
+        state.currentNode = 'Selection';
+        state.currentIP = 'N/A';
+        state.authStatus = 'PENDING';
+        updateSidebar();
+    }
+
+    function updateSidebar() {
+        document.getElementById('stat-node').innerText = state.currentNode;
+        document.getElementById('stat-ip').innerText = state.currentIP;
+        document.getElementById('stat-auth').innerText = state.authStatus;
+        
+        const bar = document.getElementById('threat-bar');
+        const txt = document.getElementById('threat-text');
+        
+        if(state.threatLevel === 'LOW') {
+            bar.style.width = '15%';
+            bar.style.backgroundColor = 'var(--accent-green)';
+            txt.innerText = 'LOW';
+        } else if(state.threatLevel === 'MEDIUM') {
+            bar.style.width = '50%';
+            bar.style.backgroundColor = 'yellow';
+            txt.innerText = 'ELEVATED';
+            txt.style.color = 'black';
+        } else {
+            bar.style.width = '90%';
+            bar.style.backgroundColor = 'var(--accent-red)';
+            txt.innerText = 'CRITICAL';
+            txt.style.color = 'white';
+        }
+    }
+
+    // --- ID Card Logic ---
+    function simulateIdSwipe() {
+        const ip = document.getElementById('id-ip-select').value;
+        const reader = document.getElementById('id-reader');
+        const statusText = document.getElementById('id-status-text');
+        const spinner = document.getElementById('id-spinner');
+
+        state.currentIP = ip;
+        updateSidebar();
+
+        reader.classList.add('swipe-active');
+        statusText.innerText = `Authenticating with Access Controller at ${ip}...`;
+        spinner.style.display = 'block';
+
+        setTimeout(() => {
+            reader.classList.remove('swipe-active');
+            spinner.style.display = 'none';
+            statusText.innerHTML = '<span class="success-msg">ACCESS GRANTED - WELCOME</span>';
+            state.authStatus = 'VERIFIED';
+            updateSidebar();
+        }, 2500);
+    }
+
+    // --- Fingerprint Logic ---
+    function startFingerprintScan() {
+        const scanner = document.getElementById('fp-scanner');
+        const statusText = document.getElementById('fp-status-text');
+        
+        scanner.classList.add('scanning');
+        statusText.innerText = "Scanning Biometrics...";
+        state.currentIP = "192.168.1.60";
+        updateSidebar();
+
+        setTimeout(() => {
+            scanner.classList.remove('scanning');
+            statusText.innerHTML = '<span class="success-msg">IDENTITY CONFIRMED</span>';
+            state.authStatus = 'VERIFIED';
+            updateSidebar();
+        }, 2000);
+    }
+
+    // --- Printer Logic ---
+    function pingPrinter() {
+        const ip = document.getElementById('printer-ip-select').value;
+        const pingBox = document.getElementById('ping-box');
+        const statusVal = document.getElementById('printer-status-val');
+        
+        state.currentIP = ip;
+        updateSidebar();
+        
+        pingBox.classList.add('pinging');
+        statusVal.innerText = "PINGING...";
+        statusVal.style.color = "var(--accent-cyan)";
+
+        setTimeout(() => {
+            pingBox.classList.remove('pinging');
+            const isOnline = Math.random() > 0.2;
+            statusVal.innerText = isOnline ? "ONLINE" : "OFFLINE / TIMEOUT";
+            statusVal.style.color = isOnline ? "var(--accent-green)" : "var(--accent-red)";
+            state.authStatus = isOnline ? "CONNECTED" : "FAILED";
+            updateSidebar();
+        }, 1500);
+    }
+
+    // --- Network Service Logic ---
+    function testConnection() {
+        const ip = document.getElementById('manual-ip').value || '0.0.0.0';
+        const spinner = document.getElementById('net-spinner');
+        const result = document.getElementById('net-result');
+
+        state.currentIP = ip;
+        updateSidebar();
+
+        spinner.style.opacity = '1';
+        result.innerText = "Establishing TCP Handshake...";
+        result.style.color = "white";
+
+        setTimeout(() => {
+            spinner.style.opacity = '0';
+            const success = Math.random() > 0.4;
+            result.innerHTML = success ? 
+                '<span class="success-msg">Handshake Successful</span>' : 
+                '<span class="error-msg">Connection Refused</span>';
+            
+            state.authStatus = success ? "SUCCESS" : "ERROR";
+            if(!success) {
+                state.threatLevel = 'MEDIUM';
+            }
+            updateSidebar();
+        }, 2000);
+    }
+
+    // --- Web Login ---
+    function simulateAuth(type) {
+        state.currentIP = "127.0.0.1";
+        state.authStatus = "VERIFIED";
+        updateSidebar();
+        alert("Authentication Successful. Session Logged to Audit Chain.");
+    }
+
+    window.onload = init;
+</script>
+
+</body>
+</html>

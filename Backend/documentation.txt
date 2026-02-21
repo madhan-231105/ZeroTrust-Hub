@@ -1,0 +1,152 @@
+1. System Overview
+
+The backend is a high-security middleware designed to monitor network infrastructure (Printers, ID Scanners, Biometrics) while ensuring administrative integrity. It uses a Hybrid Storage Architecture:
+
+    MySQL: Stores relational data like user credentials and session history for fast querying.
+
+    Blockchain Ledger: An immutable JSON-based hash-chain that records every security event. If a single bit of this file is changed, the chain breaks, alerting the admin to tampering.
+
+2. Prerequisites
+
+Before installation, ensure the target system has:
+
+    Python 3.8+
+
+    MySQL Server 8.0+
+
+    Network Access: The server must be able to "ping" (TCP connect) the IPs of the infrastructure devices.
+
+3. Installation & Setup
+Step 1: Install Dependencies
+
+Run the following command to install required Python libraries:
+code Bash
+
+pip install flask mysql-connector-python bcrypt getmac
+
+Step 2: Database Initialization
+
+Log into your MySQL terminal and execute these commands to set up the environment:
+code SQL
+
+CREATE DATABASE network_monitor;
+USE network_monitor;
+
+-- Table for Admin Users
+CREATE TABLE admins (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL
+);
+
+-- Table for Session History
+CREATE TABLE access_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50),
+    ip_address VARCHAR(45),
+    login_time DATETIME,
+    logout_time DATETIME,
+    duration_seconds INT,
+    status VARCHAR(20), -- SUCCESS, FAILED, BLOCKED
+    fingerprint VARCHAR(64)
+);
+
+-- Create default admin (Password: admin123)
+INSERT INTO admins (username, password_hash) 
+VALUES ('admin', '$2b$12$K7O8vO6.uXp9v.vPzM0vO.xO1X.z/6A7B8C9D0E1F2G3H4I5J6K');
+
+Step 3: Configure the Backend
+
+In the Python script, update the db_config dictionary with your local MySQL credentials:
+code Python
+
+db_config = {
+    "host": "localhost",
+    "user": "root",
+    "password": "YOUR_ACTUAL_PASSWORD",
+    "database": "network_monitor"
+}
+
+4. Understanding Security Features
+A. The Blockchain Ledger (secure_logs_chain.json)
+
+Every time a login occurs or a device goes offline, a "Block" is created.
+
+    Hash Linking: Block
+
+            
+    NN
+
+          
+
+    contains the hash of Block
+
+            
+    N−1N−1
+
+          
+
+    .
+
+    HMAC Signing: Each block is signed with a secret_key. Even if an attacker recalculates hashes, they cannot reproduce the HMAC signature without the key.
+
+    Verification: On every dashboard refresh, the system runs verify_chain(). If any block was modified, the dashboard will report "Ledger Corrupted".
+
+B. Threat Detection Engine
+
+A background thread runs every 20 seconds to perform:
+
+    MAC Spoofing Check: Uses the getmac library to ensure the hardware address of the device at a specific IP matches the authorized MAC address.
+
+    Fingerprint Analysis: When an admin logs in, a SHA256 hash of their IP + User-Agent is stored. If an attacker steals the session cookie and tries to use it from a different browser, the system detects a fingerprint mismatch and kills the session.
+
+    Brute Force Protection: MySQL is queried for failed attempts. 5 failures within 5 minutes results in a temporary IP block.
+
+5. API Reference
+POST /login
+
+Authenticates the admin and creates a blockchain record.
+
+    Payload: {"username": "admin", "password": "admin123"}
+
+    Returns: Session Cookie (Flask Secret Key encrypted).
+
+GET /api/monitor
+
+The primary data source for the frontend.
+
+    Security: Requires active session and fingerprint match.
+
+    Returns:
+
+        Current health of all INFRA_DEVICES.
+
+        List of the last 10 threat_alerts.
+
+        Blockchain integrity status.
+
+POST /logout
+
+Calculates total session duration and anchors the final session state into the blockchain and MySQL.
+6. Setup for "Newer Systems" (Pro-Tips)
+
+    Firewall Configuration: Ensure port 5000 (Flask) is open for the frontend, and ports 9100 (Printers) and 4370 (Scanners) are allowed through outgoing rules.
+
+    Secret Management: In a production environment, move the app.secret_key and LEDGER_HMAC_SECRET into environment variables (.env file) rather than hardcoding them.
+
+    Scaling: For systems with 100+ devices, increase the time.sleep() in the monitor_engine to 60 seconds to avoid network congestion (broadcast storms).
+
+    Audit Archiving: Periodically move secure_logs_chain.json to a "Write-Once-Read-Many" (WORM) storage for legal compliance.
+
+7. Troubleshooting
+
+    MAC Mismatch reported immediately? Your demo MAC addresses in the script likely don't match your physical hardware. Update the INFRA_DEVICES dictionary with the output of arp -a in your command prompt.
+
+    MySQL Connection Refused? Verify that the MySQL service is running and that the user has ALL PRIVILEGES on the network_monitor database.
+
+    Ledger Verification Failed? This happens if you manually edit the secure_logs_chain.json file. To reset, simply delete the file; the system will generate a new Genesis block on the next event.
+
+
+
+
+    Ithelam olunga paduchu paarunga brooo

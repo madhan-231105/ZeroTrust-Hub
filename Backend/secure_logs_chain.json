@@ -1,0 +1,13 @@
+[
+    {
+        "index": 0,
+        "timestamp": "2026-02-21T13:16:13+00:00",
+        "data": {
+            "event": "GENESIS",
+            "msg": "Audit chain initialized"
+        },
+        "previous_hash": "0",
+        "hash": "6e37ddb26fbd77cc93535ace31031bf5357e26f5114aea7679e1b9ff58df9f1d",
+        "signature": "5192e2d2735dce1e08badac34675d8cc3c6c379a498629b4b8877af5dd6b4ac9"
+    }
+]

@@ -373,6 +373,11 @@
         .success-msg { color: var(--accent-green); text-align: center; margin-top: 20px; font-weight: bold; }
         .error-msg { color: var(--accent-red); text-align: center; margin-top: 20px; font-weight: bold; }
 
+        /* ADDED: Utilities for Logout Toggle */
+        .hidden { display: none !important; }
+        .logout-btn { background: var(--accent-red); color: white; margin-top: 15px; }
+        .logout-btn:hover { filter: brightness(1.2); box-shadow: 0 0 15px rgba(255, 49, 49, 0.3); }
+
     </style>
 </head>
 <body>
@@ -422,20 +427,36 @@
             <div class="interface-panel">
                 <button class="back-btn" onclick="goBack()">&larr; BACK</button>
                 <h2 style="margin-bottom: 20px;">Web Authentication</h2>
-                <div class="input-group">
-                    <label>Username</label>
-                    <input type="text" placeholder="admin_user">
+                
+                <!-- ADDED: Wrap inputs in a form div to toggle visibility -->
+                <div id="login-form">
+                    <div class="input-group">
+                        <label>Username</label>
+                        <input type="text" placeholder="admin_user">
+                    </div>
+                    <div class="input-group">
+                        <label>Security Password</label>
+                        <input type="password" placeholder="••••••••">
+                    </div>
+                    <div style="margin-bottom: 25px; padding: 15px; background: var(--bg-deep); border-radius: 6px;">
+                        <p style="font-size: 0.7rem; color: var(--text-dim);">IP: <span id="web-ip">127.0.0.1</span></p>
+                        <p style="font-size: 0.7rem; color: var(--text-dim);">FINGERPRINT: <span id="web-fp" style="color: var(--accent-cyan);"></span></p>
+                        <p style="font-size: 0.7rem; color: var(--text-dim);">WHITELIST: <span style="color: var(--accent-green);">TRUE</span></p>
+                    </div>
+                    <button class="primary-btn" onclick="simulateAuth('web')">Login</button>
                 </div>
-                <div class="input-group">
-                    <label>Security Password</label>
-                    <input type="password" placeholder="••••••••">
+
+                <!-- ADDED: Hidden Logout Panel -->
+                <div id="logout-panel" class="hidden">
+                    <div style="text-align: center; padding: 20px; background: var(--bg-deep); border-radius: 6px; margin-bottom: 20px;">
+                        <h3 style="color: var(--accent-green); margin-bottom: 10px;">SESSION ACTIVE</h3>
+                        <p style="color: var(--text-dim);">Authenticated User:</p>
+                        <p style="color: var(--accent-cyan); font-family: monospace; font-size: 1.2rem;" id="active-user">---</p>
+                        <p style="font-size: 0.7rem; color: var(--text-dim); margin-top: 15px;">Session duration is being recorded in the secure ledger.</p>
+                    </div>
+                    <button class="primary-btn logout-btn" onclick="doLogout()">Terminate Session</button>
                 </div>
-                <div style="margin-bottom: 25px; padding: 15px; background: var(--bg-deep); border-radius: 6px;">
-                    <p style="font-size: 0.7rem; color: var(--text-dim);">IP: <span id="web-ip">127.0.0.1</span></p>
-                    <p style="font-size: 0.7rem; color: var(--text-dim);">FINGERPRINT: <span id="web-fp" style="color: var(--accent-cyan);"></span></p>
-                    <p style="font-size: 0.7rem; color: var(--text-dim);">WHITELIST: <span style="color: var(--accent-green);">TRUE</span></p>
-                </div>
-                <button class="primary-btn" onclick="simulateAuth('web')">Login</button>
+
             </div>
         </section>
 
@@ -566,179 +587,365 @@
 </div>
 
 <script>
-    // --- Global State & Initialization ---
-    const state = {
-        currentNode: 'Selection',
-        currentIP: 'N/A',
-        authStatus: 'PENDING',
-        threatLevel: 'LOW'
-    };
+/* ==============================
+   GLOBAL CONFIG
+============================== */
 
-    function init() {
-        updateClock();
-        setInterval(updateClock, 1000);
-        generateFingerprint();
+const BASE_URL = "http://192.168.1.86:5001";
+
+const state = {
+    currentNode: 'Selection',
+    currentIP: 'N/A',
+    authStatus: 'PENDING',
+    threatLevel: 'LOW'
+};
+
+/* ==============================
+   INIT
+============================== */
+
+function init() {
+    updateClock();
+    setInterval(updateClock, 1000);
+    generateFingerprint();
+    setInterval(checkBackendStatus, 8000);
+}
+
+/* ==============================
+   CLOCK
+============================== */
+
+function updateClock() {
+    const now = new Date();
+    const timeStr = now.toTimeString().split(' ')[0];
+    document.getElementById('live-clock').innerText = timeStr;
+    document.getElementById('live-clock-sidebar').innerText = timeStr;
+}
+
+/* ==============================
+   FINGERPRINT DISPLAY
+============================== */
+
+function generateFingerprint() {
+    const hex = '0123456789ABCDEF';
+    let res = '';
+    for(let i=0; i<16; i++) res += hex[Math.floor(Math.random()*16)];
+    document.getElementById('web-fp').innerText = 'SEC-' + res;
+}
+
+/* ==============================
+   NAVIGATION
+============================== */
+
+function openInterface(id) {
+    document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+    document.getElementById('view-' + id).classList.add('active');
+    state.currentNode = id.toUpperCase();
+    updateSidebar();
+}
+
+function goBack() {
+    document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+    document.getElementById('view-selection').classList.add('active');
+    state.currentNode = 'Selection';
+    state.currentIP = 'N/A';
+    state.authStatus = 'PENDING';
+    updateSidebar();
+}
+
+/* ==============================
+   SIDEBAR UPDATE
+============================== */
+
+function updateSidebar() {
+    document.getElementById('stat-node').innerText = state.currentNode;
+    document.getElementById('stat-ip').innerText = state.currentIP;
+    document.getElementById('stat-auth').innerText = state.authStatus;
+
+    const bar = document.getElementById('threat-bar');
+    const txt = document.getElementById('threat-text');
+
+    if(state.threatLevel === 'LOW') {
+        bar.style.width = '15%';
+        bar.style.backgroundColor = 'var(--accent-green)';
+        txt.innerText = 'LOW';
+        txt.style.color = 'white';
+    } 
+    else if(state.threatLevel === 'MEDIUM') {
+        bar.style.width = '50%';
+        bar.style.backgroundColor = 'yellow';
+        txt.innerText = 'ELEVATED';
+        txt.style.color = 'black';
+    } 
+    else {
+        bar.style.width = '90%';
+        bar.style.backgroundColor = 'var(--accent-red)';
+        txt.innerText = 'CRITICAL';
+        txt.style.color = 'white';
     }
+}
 
-    function updateClock() {
-        const now = new Date();
-        const timeStr = now.toTimeString().split(' ')[0];
-        document.getElementById('live-clock').innerText = timeStr;
-        document.getElementById('live-clock-sidebar').innerText = timeStr;
-    }
+/* ==============================
+   REAL LOGIN (BACKEND CONNECTED)
+============================== */
 
-    function generateFingerprint() {
-        const hex = '0123456789ABCDEF';
-        let res = '';
-        for(let i=0; i<16; i++) res += hex[Math.floor(Math.random()*16)];
-        document.getElementById('web-fp').innerText = 'SEC-' + res;
-    }
+async function simulateAuth() {
 
-    // --- Navigation ---
-    function openInterface(id) {
-        document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
-        document.getElementById('view-' + id).classList.add('active');
-        
-        // Update Sidebar
-        state.currentNode = id.toUpperCase();
-        updateSidebar();
-    }
+    const username = document.querySelector('#view-web input[type="text"]').value;
+    const password = document.querySelector('#view-web input[type="password"]').value;
 
-    function goBack() {
-        document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
-        document.getElementById('view-selection').classList.add('active');
-        state.currentNode = 'Selection';
-        state.currentIP = 'N/A';
-        state.authStatus = 'PENDING';
-        updateSidebar();
-    }
+    state.currentIP = "127.0.0.1";
+    updateSidebar();
 
-    function updateSidebar() {
-        document.getElementById('stat-node').innerText = state.currentNode;
-        document.getElementById('stat-ip').innerText = state.currentIP;
-        document.getElementById('stat-auth').innerText = state.authStatus;
-        
-        const bar = document.getElementById('threat-bar');
-        const txt = document.getElementById('threat-text');
-        
-        if(state.threatLevel === 'LOW') {
-            bar.style.width = '15%';
-            bar.style.backgroundColor = 'var(--accent-green)';
-            txt.innerText = 'LOW';
-        } else if(state.threatLevel === 'MEDIUM') {
-            bar.style.width = '50%';
-            bar.style.backgroundColor = 'yellow';
-            txt.innerText = 'ELEVATED';
-            txt.style.color = 'black';
-        } else {
-            bar.style.width = '90%';
-            bar.style.backgroundColor = 'var(--accent-red)';
-            txt.innerText = 'CRITICAL';
-            txt.style.color = 'white';
-        }
-    }
+    try {
+        const response = await fetch(BASE_URL + "/login", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ username, password })
+        });
 
-    // --- ID Card Logic ---
-    function simulateIdSwipe() {
-        const ip = document.getElementById('id-ip-select').value;
-        const reader = document.getElementById('id-reader');
-        const statusText = document.getElementById('id-status-text');
-        const spinner = document.getElementById('id-spinner');
+        const data = await response.json();
 
-        state.currentIP = ip;
-        updateSidebar();
-
-        reader.classList.add('swipe-active');
-        statusText.innerText = `Authenticating with Access Controller at ${ip}...`;
-        spinner.style.display = 'block';
-
-        setTimeout(() => {
-            reader.classList.remove('swipe-active');
-            spinner.style.display = 'none';
-            statusText.innerHTML = '<span class="success-msg">ACCESS GRANTED - WELCOME</span>';
-            state.authStatus = 'VERIFIED';
-            updateSidebar();
-        }, 2500);
-    }
-
-    // --- Fingerprint Logic ---
-    function startFingerprintScan() {
-        const scanner = document.getElementById('fp-scanner');
-        const statusText = document.getElementById('fp-status-text');
-        
-        scanner.classList.add('scanning');
-        statusText.innerText = "Scanning Biometrics...";
-        state.currentIP = "192.168.1.60";
-        updateSidebar();
-
-        setTimeout(() => {
-            scanner.classList.remove('scanning');
-            statusText.innerHTML = '<span class="success-msg">IDENTITY CONFIRMED</span>';
-            state.authStatus = 'VERIFIED';
-            updateSidebar();
-        }, 2000);
-    }
-
-    // --- Printer Logic ---
-    function pingPrinter() {
-        const ip = document.getElementById('printer-ip-select').value;
-        const pingBox = document.getElementById('ping-box');
-        const statusVal = document.getElementById('printer-status-val');
-        
-        state.currentIP = ip;
-        updateSidebar();
-        
-        pingBox.classList.add('pinging');
-        statusVal.innerText = "PINGING...";
-        statusVal.style.color = "var(--accent-cyan)";
-
-        setTimeout(() => {
-            pingBox.classList.remove('pinging');
-            const isOnline = Math.random() > 0.2;
-            statusVal.innerText = isOnline ? "ONLINE" : "OFFLINE / TIMEOUT";
-            statusVal.style.color = isOnline ? "var(--accent-green)" : "var(--accent-red)";
-            state.authStatus = isOnline ? "CONNECTED" : "FAILED";
-            updateSidebar();
-        }, 1500);
-    }
-
-    // --- Network Service Logic ---
-    function testConnection() {
-        const ip = document.getElementById('manual-ip').value || '0.0.0.0';
-        const spinner = document.getElementById('net-spinner');
-        const result = document.getElementById('net-result');
-
-        state.currentIP = ip;
-        updateSidebar();
-
-        spinner.style.opacity = '1';
-        result.innerText = "Establishing TCP Handshake...";
-        result.style.color = "white";
-
-        setTimeout(() => {
-            spinner.style.opacity = '0';
-            const success = Math.random() > 0.4;
-            result.innerHTML = success ? 
-                '<span class="success-msg">Handshake Successful</span>' : 
-                '<span class="error-msg">Connection Refused</span>';
+        if (response.ok) {
+            state.authStatus = "VERIFIED";
+            alert("Login Successful ✅");
             
-            state.authStatus = success ? "SUCCESS" : "ERROR";
-            if(!success) {
-                state.threatLevel = 'MEDIUM';
+            // ADDED: Switch UI to Logout Panel
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('logout-panel').classList.remove('hidden');
+            document.getElementById('active-user').innerText = username;
+            
+        } else {
+            state.authStatus = "DENIED";
+            alert(data.error || "Login Failed");
+        }
+
+    } catch (err) {
+        state.authStatus = "ERROR";
+        alert("Backend not reachable");
+    }
+
+    updateSidebar();
+}
+
+/* ==============================
+   ADDED: LOGOUT FUNCTION
+============================== */
+
+async function doLogout() {
+    try {
+        const response = await fetch(BASE_URL + "/logout", { 
+            method: "POST",
+            credentials: "include"
+        });
+        
+        if (response.ok) {
+            state.authStatus = "CLOSED";
+            
+            // Switch UI back to Login Form
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('logout-panel').classList.add('hidden');
+            
+            // Clear password
+            document.querySelector('#view-web input[type="password"]').value = '';
+            
+            alert("Session Closed - Duration Logged in SQL");
+        }
+    } catch(e) {
+        console.error(e);
+        alert("Logout failed");
+    }
+    updateSidebar();
+}
+
+/* ==============================
+   PRINTER STATUS (REAL API)
+============================== */
+
+async function pingPrinter() {
+
+    const ip = document.getElementById('printer-ip-select').value;
+    state.currentIP = ip;
+    updateSidebar();
+
+    try {
+        const response = await fetch(BASE_URL + "/api/monitor", {
+            credentials: "include"
+        });
+
+        if (!response.ok) {
+            alert("Unauthorized. Please login first.");
+            state.authStatus = "UNAUTHORIZED";
+            updateSidebar();
+            return;
+        }
+
+        const data = await response.json();
+        const printer = data.infrastructure?.HR_Printer;
+
+        if (printer && printer.status) {
+            document.getElementById("printer-status-val").innerText = "ONLINE";
+            document.getElementById("printer-status-val").style.color = "var(--accent-green)";
+            state.authStatus = "CONNECTED";
+        } else {
+            document.getElementById("printer-status-val").innerText = "OFFLINE";
+            document.getElementById("printer-status-val").style.color = "var(--accent-red)";
+            state.authStatus = "FAILED";
+        }
+
+    } catch (e) {
+        alert("Backend unreachable");
+        state.authStatus = "ERROR";
+    }
+
+    updateSidebar();
+}
+/* ==============================
+   ID CARD SWIPE (MISSING FUNCTION FIXED)
+============================== */
+
+async function simulateIdSwipe() {
+
+    const reader = document.getElementById('id-reader');
+    const statusText = document.getElementById('id-status-text');
+    const spinner = document.getElementById('id-spinner');
+
+    reader.classList.add('swipe-active');
+    spinner.style.display = "block";
+    statusText.innerText = "Authenticating...";
+
+    state.currentIP = document.getElementById('id-ip-select').value;
+    updateSidebar();
+
+    try {
+        const response = await fetch(BASE_URL + "/api/monitor", {
+            credentials: "include"
+        });
+
+        if (response.ok) {
+            statusText.innerHTML = '<span class="success-msg">ACCESS GRANTED</span>';
+            state.authStatus = "VERIFIED";
+        } else {
+            statusText.innerHTML = '<span class="error-msg">LOGIN REQUIRED</span>';
+            state.authStatus = "DENIED";
+        }
+
+    } catch (err) {
+        statusText.innerHTML = '<span class="error-msg">SERVER ERROR</span>';
+        state.authStatus = "ERROR";
+    }
+
+    spinner.style.display = "none";
+    updateSidebar();
+}
+
+
+/* ==============================
+   FINGERPRINT SCAN (MISSING FUNCTION FIXED)
+============================== */
+
+async function startFingerprintScan() {
+
+    const scanner = document.getElementById('fp-scanner');
+    const statusText = document.getElementById('fp-status-text');
+
+    scanner.classList.add('scanning');
+    statusText.innerText = "Scanning...";
+
+    state.currentIP = "192.168.1.60";
+    updateSidebar();
+
+    try {
+        const response = await fetch(BASE_URL + "/api/monitor", {
+            credentials: "include"
+        });
+
+        if (response.ok) {
+            statusText.innerHTML = '<span class="success-msg">IDENTITY VERIFIED</span>';
+            state.authStatus = "VERIFIED";
+        } else {
+            statusText.innerHTML = '<span class="error-msg">LOGIN REQUIRED</span>';
+            state.authStatus = "DENIED";
+        }
+
+    } catch (err) {
+        statusText.innerHTML = '<span class="error-msg">SERVER ERROR</span>';
+        state.authStatus = "ERROR";
+    }
+
+    setTimeout(() => {
+        scanner.classList.remove('scanning');
+    }, 2000);
+
+    updateSidebar();
+}
+
+/* ==============================
+   BACKEND THREAT CHECK
+============================== */
+
+async function checkBackendStatus() {
+
+    try {
+        const res = await fetch(BASE_URL + "/api/monitor", {
+            credentials: "include"
+        });
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+
+        if (data.ledger_integrity?.status === "CORRUPTED") {
+            state.threatLevel = "CRITICAL";
+        } else {
+            state.threatLevel = "LOW";
+        }
+
+    } catch (e) {
+        state.threatLevel = "MEDIUM";
+    }
+
+    updateSidebar();
+}
+
+/* ==============================
+   NETWORK TEST (OPTIONAL DEMO)
+============================== */
+
+function testConnection() {
+    const ip = document.getElementById('manual-ip').value || '0.0.0.0';
+    const result = document.getElementById('net-result');
+
+    state.currentIP = ip;
+    updateSidebar();
+
+    result.innerText = "Testing backend route...";
+    result.style.color = "white";
+
+    fetch(BASE_URL + "/api/monitor", { credentials: "include" })
+        .then(res => {
+            if(res.ok) {
+                result.innerHTML = '<span class="success-msg">Backend Reachable</span>';
+                state.authStatus = "SUCCESS";
+            } else {
+                result.innerHTML = '<span class="error-msg">Unauthorized</span>';
+                state.authStatus = "ERROR";
             }
             updateSidebar();
-        }, 2000);
-    }
+        })
+        .catch(() => {
+            result.innerHTML = '<span class="error-msg">Connection Failed</span>';
+            state.authStatus = "ERROR";
+            updateSidebar();
+        });
+}
 
-    // --- Web Login ---
-    function simulateAuth(type) {
-        state.currentIP = "127.0.0.1";
-        state.authStatus = "VERIFIED";
-        updateSidebar();
-        alert("Authentication Successful. Session Logged to Audit Chain.");
-    }
+/* ============================== */
 
-    window.onload = init;
+window.onload = init;
 </script>
 
 </body>

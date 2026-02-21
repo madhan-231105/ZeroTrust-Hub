@@ -7,8 +7,9 @@ import threading
 import bcrypt
 import mysql.connector
 from datetime import datetime, UTC, timedelta
-from flask import Flask, request, session, jsonify
+from flask import Flask, request, session, jsonify, send_from_directory
 from functools import wraps
+from flask_cors import CORS
 
 # ===============================
 # GLOBAL SECURITY SETTINGS
@@ -16,11 +17,10 @@ from functools import wraps
 
 MAX_ATTEMPTS = 5
 LOCK_TIME_SECONDS = 60
-
 FAILED_IP_ATTEMPTS = {}
 
 # ===============================
-# 1. IMMUTABLE LEDGER
+# IMMUTABLE LEDGER
 # ===============================
 
 class ImmutableAuditLedger:
@@ -43,15 +43,16 @@ class ImmutableAuditLedger:
     def _create_genesis_block(self):
         ts = datetime.now(UTC).isoformat(timespec="seconds")
         data = {"event": "GENESIS", "msg": "Audit chain initialized"}
-        h = self._calculate_hash(0, ts, data, "0")
+
+        block_hash = self._calculate_hash(0, ts, data, "0")
 
         block = {
             "index": 0,
             "timestamp": ts,
             "data": data,
             "previous_hash": "0",
-            "hash": h,
-            "signature": self._sign_hash(h)
+            "hash": block_hash,
+            "signature": self._sign_hash(block_hash)
         }
 
         self._atomic_save([block])
@@ -76,6 +77,7 @@ class ImmutableAuditLedger:
 
         for i in range(len(chain)):
             b = chain[i]
+
             recalculated = self._calculate_hash(
                 b["index"], b["timestamp"], b["data"], b["previous_hash"]
             )
@@ -98,6 +100,7 @@ class ImmutableAuditLedger:
             ts = datetime.now(UTC).isoformat(timespec="seconds")
 
             data = {"event_type": event_type, "payload": payload}
+
             new_index = prev["index"] + 1
             h = self._calculate_hash(new_index, ts, data, prev["hash"])
 
@@ -113,19 +116,18 @@ class ImmutableAuditLedger:
             chain.append(new_block)
             self._atomic_save(chain)
 
-
 # ===============================
 # FLASK APP
 # ===============================
 
 app = Flask(__name__)
-app.secret_key = "highly_secure_and_random_key"
+app.secret_key = "CHANGE_THIS_TO_RANDOM_SECRET"
+CORS(app, supports_credentials=True)
 
 ledger = ImmutableAuditLedger()
-
 valid, msg = ledger.verify_chain()
 if not valid:
-    print(f"[FATAL] Ledger corrupted at startup: {msg}")
+    print(f"[FATAL] Ledger corrupted: {msg}")
     exit()
 else:
     print("[OK] Ledger integrity verified.")
@@ -145,24 +147,81 @@ def get_db_connection():
     return mysql.connector.connect(**db_config)
 
 # ===============================
-# LOGGING
+# LOGGING FUNCTIONS
 # ===============================
 
-def log_event(user, ip, status, event_type, msg):
+def create_login_log(user, ip, fingerprint, status):
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO access_logs (username, ip_address, login_time, status)
-            VALUES (%s, %s, %s, %s)
-        """, (user, ip, datetime.now(UTC), status))
-        conn.commit()
-        cursor.close()
-        conn.close()
-    except:
-        pass
 
-    ledger.add_block(event_type, {"user": user, "ip": ip, "msg": msg})
+        # FIX 1: Use naive time for MySQL compatibility
+        now_naive = datetime.now(UTC).replace(tzinfo=None)
+
+        cursor.execute("""
+            INSERT INTO access_logs
+            (username, ip_address, login_time, status, fingerprint)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (user, ip, now_naive, status, fingerprint))
+
+        conn.commit()
+        
+        # FIX 2: Ensure ID is captured
+        log_id = cursor.lastrowid
+        print(f"[DEBUG] Log created. Status: {status}, ID: {log_id}")
+
+        cursor.close()
+        return log_id
+
+    except Exception as e:
+        print(f"[ERROR] Login Log Failed: {e}")
+        return None
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+def close_login_session(log_id):
+    conn = None
+    try:
+        if not log_id:
+            return
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT login_time FROM access_logs WHERE id=%s", (log_id,))
+        row = cursor.fetchone()
+
+        if row:
+            login_time = row[0]
+            
+            # FIX 3: Timezone aware subtraction fix
+            if login_time.tzinfo:
+                login_time = login_time.replace(tzinfo=None)
+                
+            logout_time = datetime.now(UTC).replace(tzinfo=None)
+            
+            duration = int((logout_time - login_time).total_seconds())
+
+            cursor.execute("""
+                UPDATE access_logs
+                SET logout_time=%s,
+                    duration_seconds=%s,
+                    status='CLOSED'
+                WHERE id=%s
+            """, (logout_time, duration, log_id))
+
+            conn.commit()
+            print(f"[DEBUG] Session {log_id} closed. Duration: {duration}s")
+
+        cursor.close()
+
+    except Exception as e:
+        print(f"[ERROR] Logout Update Failed: {e}")
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
 
 # ===============================
 # SECURITY HELPERS
@@ -181,12 +240,19 @@ def get_fingerprint():
     return hashlib.sha256(raw.encode()).hexdigest()
 
 # ===============================
-# LOGIN ROUTE
+# SERVE FRONTEND
+# ===============================
+
+@app.route("/")
+def serve_client():
+    return send_from_directory(".", "client.html")
+
+# ===============================
+# LOGIN (UPDATED)
 # ===============================
 
 @app.route("/login", methods=["POST"])
 def login():
-
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "Invalid request"}), 400
@@ -194,8 +260,21 @@ def login():
     username = data.get("username")
     password = data.get("password")
     ip = request.remote_addr
+    
+    # Calculate fingerprint early so we can log it on failure
+    fingerprint = get_fingerprint() 
+    
+    now = datetime.now(UTC)
 
-    attempts = FAILED_IP_ATTEMPTS.get(ip, 0)
+    # 1. Check IP Block
+    if ip in FAILED_IP_ATTEMPTS:
+        info = FAILED_IP_ATTEMPTS[ip]
+        if info.get("lock_until") and now < info["lock_until"]:
+            # LOG BLOCKING EVENT
+            create_login_log(username, ip, fingerprint, "BLOCKED")
+            return jsonify({"error": "IP temporarily blocked"}), 403
+
+    attempts = FAILED_IP_ATTEMPTS.get(ip, {}).get("count", 0)
 
     try:
         conn = get_db_connection()
@@ -205,41 +284,88 @@ def login():
         cursor.close()
         conn.close()
 
+        # 2. Check User Existence
         if not row:
+            # LOG FAILED EVENT (User not found)
+            create_login_log(username, ip, fingerprint, "FAILED")
             return jsonify({"error": "Access Denied"}), 401
 
         stored_hash = row[0]
         if isinstance(stored_hash, str):
             stored_hash = stored_hash.encode()
 
-        # SUCCESS
+        # 3. Check Password
         if bcrypt.checkpw(password.encode(), stored_hash):
+
             FAILED_IP_ATTEMPTS.pop(ip, None)
+
+            # LOG SUCCESS EVENT
+            log_id = create_login_log(
+                username,
+                ip,
+                fingerprint,
+                "OPEN"
+            )
 
             session["admin_user"] = username
-            session["fingerprint"] = get_fingerprint()
+            session["fingerprint"] = fingerprint
+            session["log_id"] = log_id
 
-            log_event(username, ip, "SUCCESS", "LOGIN", "Login successful")
+            ledger.add_block("LOGIN", {
+                "user": username,
+                "ip": ip
+            })
+
             return jsonify({"message": "Access Granted"})
 
-        # FAILURE
+        # 4. Failed Login (Wrong Password)
         attempts += 1
-        FAILED_IP_ATTEMPTS[ip] = attempts
 
         if attempts >= MAX_ATTEMPTS:
-            # Reset immediately so future valid login works
-            FAILED_IP_ATTEMPTS.pop(ip, None)
+            FAILED_IP_ATTEMPTS[ip] = {
+                "count": attempts,
+                "lock_until": now + timedelta(seconds=LOCK_TIME_SECONDS)
+            }
+            # LOG BLOCKING EVENT (After threshold reached)
+            create_login_log(username, ip, fingerprint, "BLOCKED")
+            return jsonify({"error": "IP temporarily blocked"}), 403
 
-            return jsonify({
-                "error": "IP temporarily blocked"
-            }), 403
+        FAILED_IP_ATTEMPTS[ip] = {"count": attempts, "lock_until": None}
 
-        log_event(username, ip, "FAILED", "AUTH_FAILURE", "Invalid password")
+        # LOG FAILED EVENT (Wrong Password)
+        create_login_log(username, ip, fingerprint, "FAILED")
+
         return jsonify({"error": "Access Denied"}), 401
 
     except Exception as e:
         print("Auth Error:", e)
+        # LOG SYSTEM ERROR
+        create_login_log(username, ip, fingerprint, "ERROR")
         return jsonify({"error": "Server error"}), 500
+
+# ===============================
+# LOGOUT
+# ===============================
+
+@app.route("/logout", methods=["POST"])
+@login_required
+def logout():
+
+    user = session.get("admin_user")
+    ip = request.remote_addr
+    log_id = session.get("log_id")
+
+    if log_id:
+        close_login_session(log_id)
+
+    ledger.add_block("LOGOUT", {
+        "user": user,
+        "ip": ip
+    })
+
+    session.clear()
+
+    return jsonify({"message": "Logged out"})
 
 # ===============================
 # PROTECTED API
@@ -264,9 +390,9 @@ def api_monitor():
         }), 500
 
     return jsonify({
-        "ledger_integrity": {
-            "status": "SECURE"
-        }
+        "infrastructure": { "HR_Printer": { "status": True } },
+        "ledger_integrity": {"status": "SECURE"},
+        "server_time": datetime.now(UTC).isoformat(timespec="seconds")
     })
 
 # ===============================

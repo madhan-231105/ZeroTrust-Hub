@@ -9,5 +9,163 @@
         "previous_hash": "0",
         "hash": "6e37ddb26fbd77cc93535ace31031bf5357e26f5114aea7679e1b9ff58df9f1d",
         "signature": "5192e2d2735dce1e08badac34675d8cc3c6c379a498629b4b8877af5dd6b4ac9"
+    },
+    {
+        "index": 1,
+        "timestamp": "2026-02-21T22:23:45+00:00",
+        "data": {
+            "event_type": "LOGIN",
+            "payload": {
+                "user": "admin",
+                "ip": "192.168.1.82",
+                "method": "WEB"
+            }
+        },
+        "previous_hash": "6e37ddb26fbd77cc93535ace31031bf5357e26f5114aea7679e1b9ff58df9f1d",
+        "hash": "05902964ddcc891923e4db7ac65ac409a9ef626b4ca8a3a55d4c39c43c25bb7d",
+        "signature": "bd7f4f83b78b0781cc66a8fbff997679007b3d215773761329de9d7c0b35fd1e"
+    },
+    {
+        "index": 2,
+        "timestamp": "2026-02-21T22:23:51+00:00",
+        "data": {
+            "event_type": "LOGOUT",
+            "payload": {
+                "user": "admin",
+                "ip": "192.168.1.86"
+            }
+        },
+        "previous_hash": "05902964ddcc891923e4db7ac65ac409a9ef626b4ca8a3a55d4c39c43c25bb7d",
+        "hash": "77fadc2400823a899da207e74f029b5d3c6344ef791cfd860378c0bed1f5a158",
+        "signature": "8669f1cbc8e0c27b66f6e770d3b101a82f56a95c433d333034a1a19657cb4bd8"
+    },
+    {
+        "index": 3,
+        "timestamp": "2026-02-21T22:24:21+00:00",
+        "data": {
+            "event_type": "MANUAL_BLOCK",
+            "payload": {
+                "ip": "192.168.1.86",
+                "admin": "admin"
+            }
+        },
+        "previous_hash": "77fadc2400823a899da207e74f029b5d3c6344ef791cfd860378c0bed1f5a158",
+        "hash": "4e8d16a53ca1ee5771fb8016de0d520e80080d5ed385514f746b9a754173f5db",
+        "signature": "dec9076b16629a8c84d0cc9f559215a6186e02db752710f6aa756b9057ce2f3a"
+    },
+    {
+        "index": 4,
+        "timestamp": "2026-02-21T22:25:05+00:00",
+        "data": {
+            "event_type": "MANUAL_BLOCK",
+            "payload": {
+                "ip": "192.168.1.86",
+                "admin": "admin"
+            }
+        },
+        "previous_hash": "4e8d16a53ca1ee5771fb8016de0d520e80080d5ed385514f746b9a754173f5db",
+        "hash": "b48fef139dac4dcdc8963d591e795fdf327d2d390e467b5a9ae2446eb4e28d89",
+        "signature": "90b1e233b3bf14ed08e9762ff47870cb62168b482d66d8a87db84c30791e8b3c"
+    },
+    {
+        "index": 5,
+        "timestamp": "2026-02-21T22:25:17+00:00",
+        "data": {
+            "event_type": "MANUAL_UNBLOCK",
+            "payload": {
+                "ip": "192.168.1.86",
+                "admin": "admin"
+            }
+        },
+        "previous_hash": "b48fef139dac4dcdc8963d591e795fdf327d2d390e467b5a9ae2446eb4e28d89",
+        "hash": "bc97626a76344e2a27703b7dcebdf9f78bff6f8b16a958370b19cfa960b855ce",
+        "signature": "9528067f116a719f55bcca1207a8e5e57694b8bcd090b538646efb2208110473"
+    },
+    {
+        "index": 6,
+        "timestamp": "2026-02-21T22:31:17+00:00",
+        "data": {
+            "event_type": "LOGIN",
+            "payload": {
+                "user": "admin",
+                "ip": "192.168.1.86",
+                "method": "WEB"
+            }
+        },
+        "previous_hash": "bc97626a76344e2a27703b7dcebdf9f78bff6f8b16a958370b19cfa960b855ce",
+        "hash": "99d89f1b25de4391ef242d545c79bbd7cced885cc1b69b1e2780e42b7ed1bc41",
+        "signature": "b414c6b3d5deb5a0188c3c153cfd08f3adf13162077f7e5d6dcf8441e56c3e62"
+    },
+    {
+        "index": 7,
+        "timestamp": "2026-02-21T22:32:37+00:00",
+        "data": {
+            "event_type": "LOGOUT",
+            "payload": {
+                "user": "admin",
+                "ip": "192.168.1.86"
+            }
+        },
+        "previous_hash": "99d89f1b25de4391ef242d545c79bbd7cced885cc1b69b1e2780e42b7ed1bc41",
+        "hash": "ea768064ac996f88243b54854c9001744a14709fefe737ab36c8b3c0e63cb009",
+        "signature": "90d99305b73dbc3f93352717388511d6cb50b9507099767d37d5d01c1e42e516"
+    },
+    {
+        "index": 8,
+        "timestamp": "2026-02-21T22:33:03+00:00",
+        "data": {
+            "event_type": "MANUAL_UNBLOCK",
+            "payload": {
+                "ip": "192.168.1.86",
+                "admin": "admin"
+            }
+        },
+        "previous_hash": "ea768064ac996f88243b54854c9001744a14709fefe737ab36c8b3c0e63cb009",
+        "hash": "7f08f3add5cfa00a6e4356d44ed76a14d6b017a5720360c0a70c847153aade17",
+        "signature": "28de8581b952b5b53758f799929dfc2b9b3c6472a7c65d3e8ec2901ed72619e7"
+    },
+    {
+        "index": 9,
+        "timestamp": "2026-02-21T22:34:02+00:00",
+        "data": {
+            "event_type": "LOGIN",
+            "payload": {
+                "user": "admin",
+                "ip": "192.168.1.86",
+                "method": "WEB"
+            }
+        },
+        "previous_hash": "7f08f3add5cfa00a6e4356d44ed76a14d6b017a5720360c0a70c847153aade17",
+        "hash": "d9f58e505bb3c7a89d310b2704de0f5136afd6880caa89329db2b585a5f43f2e",
+        "signature": "78700ceabbc0f8f606d95e7609a8cdb77bce7501dfdc9d9eee53b1980cf102ba"
+    },
+    {
+        "index": 10,
+        "timestamp": "2026-02-21T22:45:17+00:00",
+        "data": {
+            "event_type": "MANUAL_BLOCK",
+            "payload": {
+                "ip": "192.168.1.82",
+                "admin": "admin"
+            }
+        },
+        "previous_hash": "d9f58e505bb3c7a89d310b2704de0f5136afd6880caa89329db2b585a5f43f2e",
+        "hash": "39d9b313c69aa51cf07ba338f4f1b28b61dea323bcf16a6b78007abb4bf6e6fe",
+        "signature": "2fe2b17ba7a905f7c208e9d643d6032a74f447d93ee8121c7ae0579a3dbe1d29"
+    },
+    {
+        "index": 11,
+        "timestamp": "2026-02-21T23:23:54+00:00",
+        "data": {
+            "event_type": "LOGIN",
+            "payload": {
+                "user": "madhan",
+                "ip": "192.168.1.86",
+                "method": "CARD"
+            }
+        },
+        "previous_hash": "39d9b313c69aa51cf07ba338f4f1b28b61dea323bcf16a6b78007abb4bf6e6fe",
+        "hash": "7846c6249bff45ecff34bbe3ce8ddddcfe83593aec6c0cfc7f2f203c089ce6bb",
+        "signature": "1d2284975d54145712cacad17d20482017d4c3ac4b308dc6615160141fa224a6"
     }
 ]

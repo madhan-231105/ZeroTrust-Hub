@@ -24,5 +24,64 @@
         "previous_hash": "e9535afba80325a6a6e47199093b73d0e913992711d0cba2f7189de9949c51cf",
         "hash": "55e1f2f3b623c2c8e77978e31ba88ef69869e2ae14f1bd177f2d32e7727e22f1",
         "signature": "d1f3c1e0704a877b97997df69a245225e95df77c7390eaf1fda24d506a119db1"
+    },
+    {
+        "index": 2,
+        "timestamp": "2026-04-10T06:53:26+00:00",
+        "data": {
+            "event_type": "LOGIN",
+            "payload": {
+                "user": "admin",
+                "ip": "10.164.99.183",
+                "method": "WEB"
+            }
+        },
+        "previous_hash": "55e1f2f3b623c2c8e77978e31ba88ef69869e2ae14f1bd177f2d32e7727e22f1",
+        "hash": "f9969352e37c3994e791433bd8b98866b22d19d32c865ba994e2c174e2993311",
+        "signature": "3cd4841d9f4861f25692eb2e1d420b290c9c50dacf278d244f0705a8b273ca2f"
+    },
+    {
+        "index": 3,
+        "timestamp": "2026-04-10T06:55:20+00:00",
+        "data": {
+            "event_type": "LOGIN",
+            "payload": {
+                "user": "admin",
+                "ip": "10.164.99.208",
+                "method": "WEB"
+            }
+        },
+        "previous_hash": "f9969352e37c3994e791433bd8b98866b22d19d32c865ba994e2c174e2993311",
+        "hash": "6c1ca25b68121e42812613645ff298ad2f03ac357fc8e8127fab067fc0ea6497",
+        "signature": "f46d2af3cfa135b40a908ed7cc9118f280c3edc4911d1e08e3453e3127f56f50"
+    },
+    {
+        "index": 4,
+        "timestamp": "2026-04-10T09:30:46+00:00",
+        "data": {
+            "event_type": "LOGIN",
+            "payload": {
+                "user": "admin",
+                "ip": "10.164.99.183",
+                "method": "WEB"
+            }
+        },
+        "previous_hash": "6c1ca25b68121e42812613645ff298ad2f03ac357fc8e8127fab067fc0ea6497",
+        "hash": "c517e32ea9b5a6b6165d3900110fa398226a19bd959d8f44bde6571a9e4269ef",
+        "signature": "a372bac7f430a4dda3adf970bf7a349900bdd4de928a6934d15b5ab693570745"
+    },
+    {
+        "index": 5,
+        "timestamp": "2026-04-10T09:52:02+00:00",
+        "data": {
+            "event_type": "MANUAL_UNBLOCK",
+            "payload": {
+                "ip": "10.164.99.208",
+                "admin": "admin"
+            }
+        },
+        "previous_hash": "c517e32ea9b5a6b6165d3900110fa398226a19bd959d8f44bde6571a9e4269ef",
+        "hash": "a022a996e53613a8bc44f3444d6d8a9846b9b1139be288fd8df23609ab37e993",
+        "signature": "da5733446b382579d4bd09cdfbf9b555785cd5349e7855a9cd44f2b6118787c0"
     }
 ]

@@ -6,7 +6,7 @@ import shutil
 import threading
 import bcrypt
 import mysql.connector
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import Flask, request, session, jsonify, send_from_directory
 from functools import wraps
 from flask_cors import CORS
@@ -42,7 +42,7 @@ class ImmutableAuditLedger:
         return hmac.new(self.secret_key, block_hash.encode(), hashlib.sha256).hexdigest()
 
     def _create_genesis_block(self):
-        ts = datetime.now(UTC).isoformat(timespec="seconds")
+        ts = datetime.now(timezone.timezone.utc ).isoformat(timespec="seconds")
         data = {"event": "GENESIS", "msg": "Audit chain initialized"}
 
         block_hash = self._calculate_hash(0, ts, data, "0")
@@ -102,7 +102,7 @@ class ImmutableAuditLedger:
                 chain = self.load_chain()
                 
             prev = chain[-1]
-            ts = datetime.now(UTC).isoformat(timespec="seconds")
+            ts = datetime.now(timezone.utc ).isoformat(timespec="seconds")
 
             data = {"event_type": event_type, "payload": payload}
 
@@ -167,7 +167,7 @@ def create_login_log(user, ip, fingerprint, status):
         cursor = conn.cursor()
 
         # FIX 1: Use naive time for MySQL compatibility
-        now_naive = datetime.now(UTC).replace(tzinfo=None)
+        now_naive = datetime.now(timezone.utc ).replace(tzinfo=None)
 
         cursor.execute("""
             INSERT INTO access_logs
@@ -210,7 +210,7 @@ def close_login_session(log_id):
             if login_time.tzinfo:
                 login_time = login_time.replace(tzinfo=None)
                 
-            logout_time = datetime.now(UTC).replace(tzinfo=None)
+            logout_time = datetime.now(timezone.utc ).replace(tzinfo=None)
             
             duration = int((logout_time - login_time).total_seconds())
 
@@ -297,7 +297,7 @@ def login():
         ip = request.remote_addr
         fingerprint = get_fingerprint() 
 
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc )
 
     # 1. Check IP Block (Only for non-fingerprint methods)
     if not is_fingerprint:
@@ -440,7 +440,7 @@ def api_monitor():
     return jsonify({
         "infrastructure": { "HR_Printer": { "status": True } },
         "ledger_integrity": {"status": "SECURE"},
-        "server_time": datetime.now(UTC).isoformat(timespec="seconds")
+        "server_time": datetime.now(timezone.utc ).isoformat(timespec="seconds")
     })
 
 # ===============================
@@ -507,7 +507,7 @@ def get_failed_logins():
 def get_blocked_ips():
     """Returns the list of currently blocked IPs stored in memory"""
     blocked_list = []
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc )
     
     for ip, info in FAILED_IP_ATTEMPTS.items():
         if info.get("lock_until") and now < info["lock_until"]:
@@ -529,7 +529,7 @@ def manual_block_ip():
         return jsonify({"error": "IP required"}), 400
         
     # Block for 10 years
-    lock_time = datetime.now(UTC) + timedelta(days=3650)
+    lock_time = datetime.now(timezone.utc ) + timedelta(days=3650)
     
     FAILED_IP_ATTEMPTS[ip] = {
         "count": 999,
